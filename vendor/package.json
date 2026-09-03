@@ -1,0 +1,6 @@
+{
+  "name": "flashcards-vendor",
+  "private": true,
+  "//": "루트의 type: module 로부터 CommonJS 엔진을 격리한다. 스킬 페이로드에는 들어가지 않는다.",
+  "type": "commonjs"
+}

@@ -1,0 +1,28 @@
+[package]
+name = "flashcard"
+version = "0.1.0"
+description = "flashcard — 플래시카드 덱 에디터"
+authors = ["flashcard"]
+edition = "2021"
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "flashcard_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-log = "2"
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "6"
+# 스킬 사본을 바이너리에 넣는다 — 실행 시점에 vendor/ 를 찾지 않는다
+include_dir = "0.7"

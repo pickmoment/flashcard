@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>플래시카드</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<!-- MERMAID: 덱에 mermaid 카드가 있을 때만 아래 한 줄의 주석을 해제한다. 없으면 그대로 둔다(코드블록으로 폴백). -->
+<!-- <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script> -->
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --bg:#f6f7f9; --card:#fff; --card-back:#fffdf7; --ink:#1a1d21; --sub:#6b7280;
+  --accent:#4f6ef7; --accent-lite:#7c8ef8; --accent-tint:rgba(79,110,247,.11);
+  --ok:#16a34a; --bad:#dc2626; --ok-tint:rgba(22,163,74,.1); --bad-tint:rgba(220,38,38,.1);
+  --radius:20px; --shadow:0 8px 30px rgba(0,0,0,.08); --border:1px solid rgba(127,127,127,.12);
+  --line:rgba(127,127,127,.18);
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#111318; --card:#1c1f26; --card-back:#20242c; --ink:#e8eaed; --sub:#9aa0a6;
+    --accent:#7c8ef8; --accent-lite:#a5b2fb; --accent-tint:rgba(124,142,248,.16);
+    --ok:#4ade80; --bad:#f87171; --ok-tint:rgba(74,222,128,.12); --bad-tint:rgba(248,113,113,.12);
+    --shadow:0 8px 30px rgba(0,0,0,.45); }
+}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  word-break:keep-all;overflow-wrap:break-word;-webkit-text-size-adjust:100%;
+  display:flex;flex-direction:column;min-height:100%}
+
+/* ---------- header ---------- */
+.top{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;justify-content:space-between;
+  padding:18px clamp(14px,4vw,32px);border-bottom:1px solid var(--line)}
+.brand h1{margin:0;font-size:clamp(1.05rem,2.4vw,1.35rem);font-weight:700;letter-spacing:-.01em}
+.brand .sub{margin:2px 0 0;font-size:.8rem;color:var(--sub)}
+.tabs{display:flex;gap:4px;background:var(--accent-tint);padding:4px;border-radius:999px}
+.tab{border:0;background:transparent;color:var(--sub);font:inherit;font-size:.85rem;font-weight:600;
+  padding:6px 16px;border-radius:999px;cursor:pointer}
+.tab.active{background:var(--card);color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.tools{display:flex;gap:6px;flex-wrap:wrap}
+.tool{border:var(--border);background:var(--card);color:var(--sub);font:inherit;font-size:.78rem;
+  padding:7px 12px;border-radius:999px;cursor:pointer;transition:.15s}
+.tool:hover{color:var(--ink);border-color:var(--accent)}
+.tool.on{background:var(--accent);color:#fff;border-color:transparent}
+
+/* ---------- progress ---------- */
+.wrap{flex:1;display:flex;flex-direction:column;padding:clamp(14px,3vw,26px) clamp(14px,4vw,32px);gap:16px}
+.progress-wrap{max-width:640px;width:min(92vw,640px);margin:0 auto;display:flex;flex-direction:column;gap:6px}
+.bar{height:6px;background:rgba(127,127,127,.15);border-radius:999px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;border-radius:999px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-lite));transition:width .25s}
+.pmeta{display:flex;justify-content:space-between;font-size:.76rem;color:var(--sub)}
+.counts b{font-weight:700;margin-left:8px}
+.counts .ok{color:var(--ok)} .counts .bad{color:var(--bad)}
+
+/* ---------- chips ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.chip{border:var(--border);background:var(--card);color:var(--sub);font:inherit;font-size:.76rem;
+  padding:6px 13px;border-radius:999px;cursor:pointer}
+.chip.active{background:var(--accent);color:#fff;border-color:transparent}
+.warn{margin:0 auto;font-size:.74rem;color:var(--bad);background:var(--bad-tint);
+  padding:4px 12px;border-radius:999px}
+
+/* ---------- card ---------- */
+main{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:clamp(14px,2.5vh,20px)}
+.card-scene{perspective:1200px;width:min(92vw,640px);margin:0 auto}
+.card{position:relative;width:100%;aspect-ratio:8/5;min-height:min(230px,46vh);
+  max-height:calc(100dvh - 330px);   /* 알아요/몰라요 버튼이 접히지 않게 뷰포트에 맞춘다 */
+  transform-style:preserve-3d;transition:transform .45s cubic-bezier(.4,.1,.2,1);cursor:pointer}
+.card.flipped{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  background:var(--card);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:clamp(20px,3.4vw,34px);display:flex;flex-direction:column;overflow:auto;transition:box-shadow .2s}
+.face.front{align-items:center;justify-content:center;text-align:center}
+.face.back{transform:rotateY(180deg);background:var(--card-back);text-align:left}
+.card-scene:hover .card:not(.flipped) .face.front{box-shadow:0 14px 40px rgba(0,0,0,.14)}
+.cat-badge{position:absolute;top:14px;left:16px;background:var(--accent-tint);color:var(--accent);
+  border-radius:999px;padding:3px 12px;font-size:.7rem;font-weight:600;letter-spacing:.04em}
+.ctx{font-size:.8rem;color:var(--sub);margin-bottom:10px}
+.q{font-size:clamp(1.15rem,3.2vw,1.9rem);font-weight:600;line-height:1.45}
+.q.small{font-size:clamp(1rem,2.4vw,1.3rem);font-weight:500}
+.flip-hint{position:absolute;bottom:14px;left:0;right:0;font-size:.75rem;color:var(--sub);opacity:.85}
+.back-a{font-size:clamp(1rem,2.4vw,1.28rem);line-height:1.65}
+.back-a strong{color:var(--accent)}
+.back-q{font-size:.78rem;color:var(--sub);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.note{margin-top:auto;padding-top:14px;font-size:.85rem;color:var(--sub);line-height:1.6}
+.face p{margin:0 0 .6em} .face p:last-child{margin-bottom:0}
+.face ul,.face ol{margin:.3em 0;padding-left:1.3em;line-height:1.65;text-align:left}
+.face li{margin:.2em 0}
+.face code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;
+  background:var(--accent-tint);padding:.1em .35em;border-radius:5px}
+.face pre.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85em;line-height:1.55;
+  background:var(--bg);border:var(--border);border-radius:8px;padding:12px 14px;overflow:auto;text-align:left;margin:.5em 0}
+.face hr{border:0;border-top:1px solid var(--line);margin:.9em 0}
+.face img{max-width:100%;max-height:40vh;border-radius:12px;display:block;margin:.4em auto}
+.blank{display:inline-block;min-width:4.5ch;border-bottom:2px solid var(--accent);margin:0 2px}
+.filled{background:var(--accent-tint);color:var(--accent);font-weight:700;border-radius:5px;padding:.05em .3em}
+.seq-items{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
+.seq-item{background:var(--accent-tint);color:var(--accent);border-radius:10px;padding:6px 12px;font-size:.9rem;font-weight:600}
+.mermaid-slot{margin:.5em 0;text-align:center;overflow:auto}
+.mermaid-slot svg{max-width:100%;height:auto}
+/* 이미지·다이어그램은 클릭하면 확대 오버레이가 열린다 */
+.face img,.p-front img,.p-back img,.qcard img,.mermaid-slot svg{cursor:zoom-in}
+
+/* ---------- actions ---------- */
+.actions{display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
+.nav{border:var(--border);background:var(--card);color:var(--ink);font:inherit;font-size:1rem;
+  width:44px;height:44px;border-radius:50%;cursor:pointer}
+.nav:hover{border-color:var(--accent);color:var(--accent)}
+.know{border:0;font:inherit;font-size:.9rem;font-weight:700;padding:12px 22px;border-radius:999px;
+  cursor:pointer;transition:.15s;opacity:0;pointer-events:none}
+.actions.live .know{opacity:1;pointer-events:auto}
+.know kbd{font:inherit;font-size:.7em;opacity:.6;margin-left:5px}
+.know.yes{background:var(--ok-tint);color:var(--ok)}
+.know.no{background:var(--bad-tint);color:var(--bad)}
+.know.yes:hover{background:var(--ok);color:#fff} .know.no:hover{background:var(--bad);color:#fff}
+
+/* ---------- summary ---------- */
+.summary{max-width:480px;margin:0 auto;text-align:center;background:var(--card);border:var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);padding:34px 28px}
+.gauge{width:170px;height:170px;margin:0 auto 18px;border-radius:50%;display:grid;place-items:center;position:relative}
+.gauge::after{content:'';position:absolute;inset:16px;background:var(--card);border-radius:50%}
+.gauge span{position:relative;font-size:2.2rem;font-weight:800}
+.summary h2{margin:0 0 6px;font-size:1.15rem}
+.summary .sline{color:var(--sub);font-size:.86rem;margin-bottom:20px}
+.summary .sline b{margin:0 6px}
+.btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.btn{border:0;background:var(--accent);color:#fff;font:inherit;font-size:.86rem;font-weight:600;
+  padding:11px 20px;border-radius:999px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--sub);border:var(--border)}
+
+/* ---------- quiz ---------- */
+.quiz{max-width:640px;width:min(92vw,640px);margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.qcard{background:var(--card);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:clamp(20px,3.4vw,32px)}
+.qstem{font-size:clamp(1.05rem,2.6vw,1.4rem);font-weight:600;line-height:1.5;margin-bottom:18px}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{border:var(--border);background:var(--bg);color:var(--ink);font:inherit;font-size:.95rem;text-align:left;
+  padding:14px 16px;border-radius:12px;cursor:pointer;transition:.15s}
+.opt:hover:not(:disabled){border-color:var(--accent)}
+.opt.correct{background:var(--ok-tint);border-color:var(--ok);color:var(--ok);font-weight:700}
+.opt.wrong{background:var(--bad-tint);border-color:var(--bad);color:var(--bad)}
+.qinput{width:100%;font:inherit;font-size:1rem;padding:13px 15px;border-radius:12px;border:var(--border);
+  background:var(--bg);color:var(--ink)}
+.qinput:focus{outline:2px solid var(--accent);outline-offset:1px}
+.qinput.correct{border-color:var(--ok)} .qinput.wrong{border-color:var(--bad)}
+.blank-in{font:inherit;font-size:.95em;width:9ch;padding:2px 6px;border:0;border-bottom:2px solid var(--accent);
+  background:transparent;color:var(--ink);text-align:center}
+.blank-in.correct{border-color:var(--ok);color:var(--ok);font-weight:700}
+.blank-in.wrong{border-color:var(--bad);color:var(--bad);text-decoration:line-through}
+.ans-tip{font-size:.85rem;color:var(--sub);margin-top:12px}
+.ans-tip b{color:var(--ok)}
+.wrong-list{text-align:left;font-size:.85rem;color:var(--sub);margin:16px 0 0;padding-left:1.2em;line-height:1.7}
+
+/* ---------- presentation ---------- */
+.present{position:fixed;inset:0;z-index:100;background:var(--bg);color:var(--ink);display:none;
+  flex-direction:column;align-items:center;justify-content:center;
+  padding:clamp(30px,6vw,80px);text-align:center;cursor:pointer}
+.present.on{display:flex}
+.present.title .p-body,.present:not(.title) .p-title{display:none}
+.p-title-main{font-size:clamp(2rem,6vw,4.2rem);font-weight:800;line-height:1.2;letter-spacing:-.02em}
+.p-title-sub{margin-top:16px;font-size:clamp(.95rem,2vw,1.3rem);color:var(--sub)}
+.p-title-count{margin-top:26px;display:inline-block;background:var(--accent-tint);color:var(--accent);
+  padding:7px 18px;border-radius:999px;font-size:clamp(.8rem,1.5vw,1rem);font-weight:600}
+.p-body{max-width:1100px;width:100%}
+.p-cat{display:inline-block;background:var(--accent-tint);color:var(--accent);border-radius:999px;
+  padding:4px 14px;font-size:clamp(.7rem,1.3vw,.9rem);font-weight:600;letter-spacing:.04em;margin-bottom:18px}
+.p-ctx{font-size:clamp(.8rem,1.5vw,1rem);color:var(--sub);margin-bottom:14px}
+/* 공개 전 질문은 화면에 혼자 있으므로 크게 — 글자수에 따라 3단계로 자동 축소(넘침 방지) */
+.p-front{font-size:clamp(2.2rem,6vw,4rem);font-weight:700;line-height:1.32;letter-spacing:-.015em;transition:font-size .3s,color .3s}
+.p-front.len-m{font-size:clamp(1.9rem,4.6vw,3.1rem);line-height:1.38}
+.p-front.len-l{font-size:clamp(1.5rem,3.4vw,2.3rem);line-height:1.45;font-weight:600}
+/* 공개 후에는 질문이 보조로 축소되고 답이 주인공이 된다 */
+.present.revealed .p-front,
+.present.revealed .p-front.len-m,
+.present.revealed .p-front.len-l{font-size:clamp(1rem,2vw,1.45rem);color:var(--sub);font-weight:500;letter-spacing:0;line-height:1.5}
+/* 답에 이미지·다이어그램이 있으면 질문을 화면 상단에 붙이고(수직 중앙 정렬 해제) 여백도 줄여
+   답 영역을 최대로 확보한다. 텍스트만인 답은 지금처럼 화면 중앙에 두는 편이 보기 좋다. */
+.present.revealed.has-media{justify-content:flex-start;
+  padding-top:clamp(16px,2.5vh,34px);padding-bottom:clamp(16px,2.5vh,34px)}
+/* 공개 후 질문 영역은 고정 높이로 묶는다 — 이미지·코드·다이어그램이 들어가도 답을 밀어내지 않는다 */
+.present.revealed .p-front{max-height:24vh;overflow:auto;scrollbar-width:thin;flex:0 0 auto;
+  padding-bottom:2px;-webkit-overflow-scrolling:touch}   /* flex 축소로 질문이 잘리지 않게 */
+.present.revealed .p-front img{max-height:16vh;margin:.2em auto}
+.present.revealed .p-front .mermaid-slot{margin:.2em 0}
+.present.revealed .p-front .mermaid-slot svg{max-height:16vh}
+.present.revealed .p-front pre.code{font-size:.78em;line-height:1.5}
+.present.revealed .p-front ul,.present.revealed .p-front ol{font-size:.95em;margin:.2em 0}
+/* 답 영역은 질문 영역이 쓰고 남은 높이를 전부 차지하고, 넘치면 내부 스크롤 */
+.present.revealed .p-back{overflow:auto;scrollbar-width:thin}
+.present.revealed .p-back .mermaid-slot svg{max-height:50vh}
+.present.revealed .p-back img{max-height:48vh}
+.present.revealed.has-media .p-body{display:flex;flex-direction:column;height:100%;min-height:0}
+.present.revealed.has-media .p-cat{align-self:center;margin-bottom:10px}
+.present.revealed.has-media .p-ctx{margin-bottom:8px}
+.present.revealed.has-media .p-back{flex:1 1 auto;min-height:0;margin-top:16px;padding-top:16px;
+  display:flex;flex-direction:column;justify-content:center}   /* 가로로 넓은 다이어그램처럼 높이가 남으면 중앙에 */
+.p-zoom-hint{margin-top:14px;flex:0 0 auto;font-size:clamp(.7rem,1.2vw,.85rem);color:var(--sub);opacity:.7}
+.p-hint{margin-top:34px;font-size:clamp(.75rem,1.4vw,.9rem);color:var(--sub);opacity:.7}
+.present.revealed .p-hint{display:none}
+.p-back{display:none;margin-top:26px;padding-top:26px;border-top:1px solid var(--line);
+  font-size:clamp(1.6rem,4.5vw,3rem);font-weight:800;line-height:1.35}
+.present.revealed .p-back{display:block}
+.p-back strong{color:var(--accent)}
+/* p-back은 폰트가 3rem급이라 기본 p 여백(1em=48px)이 화면을 크게 잡아먹는다 → 최소화 */
+.p-back p{margin:0 0 .3em}
+.p-back p:last-child{margin-bottom:0}
+.present.revealed .p-back .mermaid-slot{margin:.1em 0}
+.p-back .note{font-size:.42em;font-weight:400;margin-top:18px;padding-top:0}
+.p-back pre.code{font-size:.4em;text-align:left}
+.p-back img{max-height:55vh}
+.p-front img{max-height:48vh}
+.p-back .mermaid-slot svg{max-height:60vh}
+.p-back ul,.p-back ol{display:inline-block;text-align:left;font-size:.72em}
+.present .seq-items{gap:12px;margin-top:26px}
+.present .seq-item{font-size:clamp(1rem,2.2vw,1.6rem);padding:8px 18px;border-radius:12px}
+.present.revealed .seq-item{font-size:clamp(.85rem,1.5vw,1.05rem);padding:5px 12px}
+.p-meta{position:fixed;top:22px;right:26px;font-size:.85rem;color:var(--sub);letter-spacing:.04em}
+.p-bar{position:fixed;left:0;bottom:0;height:4px;width:0;
+  background:linear-gradient(90deg,var(--accent),var(--accent-lite));transition:width .3s}
+.p-controls{position:fixed;bottom:20px;right:24px;display:flex;gap:8px;opacity:0;transition:.2s}
+.present:hover .p-controls,.p-controls:focus-within{opacity:1}
+.p-controls button{border:var(--border);background:var(--card);color:var(--ink);font:inherit;
+  width:40px;height:40px;border-radius:50%;cursor:pointer}
+
+/* ---------- zoom (제자리 확대) ---------- */
+/* 별도 화면을 띄우지 않고 그 자리에서 키운다 → 스크롤로 훑어본다 */
+.zoomed{cursor:zoom-out!important;position:relative;z-index:1;border-radius:8px;
+  background:var(--card);box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.zoom-scroll{overflow:auto!important;scrollbar-width:thin;overscroll-behavior:contain}
+.mermaid-slot.zoom-scroll{overflow:visible!important}          /* 스크롤은 바깥 컨테이너가 담당 */
+.p-back.zoom-scroll,.p-front.zoom-scroll{display:block!important;text-align:center}
+.face.zoom-scroll{align-items:flex-start;justify-content:flex-start}
+.p-front.zoom-scroll{max-height:78vh}
+.zoom-badge{position:fixed;left:50%;transform:translateX(-50%);bottom:56px;z-index:2;
+  background:var(--accent);color:#fff;font-size:.76rem;font-weight:600;padding:6px 14px;border-radius:999px;
+  box-shadow:var(--shadow);pointer-events:none}
+
+/* ---------- footer ---------- */
+.kbd-hint{text-align:center;padding:14px;font-size:.74rem;color:var(--sub);border-top:1px solid var(--line)}
+[hidden]{display:none!important}
+@media (max-width:640px){
+  .kbd-hint{display:none}
+  .top{padding:14px}
+  .card{aspect-ratio:auto;min-height:50vh;max-height:calc(100dvh - 250px)}
+}
+@media (prefers-reduced-motion:reduce){
+  .card{transition:none}
+  .card.flipped{transform:none}
+  .face{backface-visibility:visible;-webkit-backface-visibility:visible;transition:opacity .2s}
+  .face.back{transform:none;opacity:0}
+  .card.flipped .face.front{opacity:0}
+  .card.flipped .face.back{opacity:1}
+  .bar i,.p-bar,.p-front{transition:none}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <h1 id="deck-title">덱 제목</h1>
+    <p class="sub" id="deck-sub"></p>
+  </div>
+  <nav class="tabs" id="tabs" aria-label="학습 모드" hidden>
+    <button class="tab active" data-view="study" aria-label="카드 학습 탭">카드 학습</button>
+    <button class="tab" data-view="quiz" aria-label="퀴즈 탭">퀴즈</button>
+  </nav>
+  <div class="tools">
+    <button class="tool" id="btn-present" aria-label="프레젠테이션 모드 시작 (P)" title="프레젠테이션 (P)">▶ 발표</button>
+    <button class="tool" id="btn-shuffle" aria-label="카드 순서 셔플 (S)" title="셔플 (S)">🔀 셔플</button>
+    <button class="tool" id="btn-reverse" hidden aria-label="앞뒤 방향 전환" title="앞뒤 방향 전환">⇄ 뒤→앞</button>
+    <button class="tool" id="btn-reset" aria-label="학습 진행 초기화" title="진행 초기화">↺ 초기화</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ===== 카드 학습 ===== -->
+  <section id="view-study" style="flex:1;display:flex;flex-direction:column;gap:16px">
+    <div class="progress-wrap">
+      <div class="bar"><i id="bar-fill"></i></div>
+      <div class="pmeta" role="status" aria-live="polite">
+        <span id="pos">0 / 0</span>
+        <span class="counts"><b class="ok" id="cnt-ok">✓ 0</b><b class="bad" id="cnt-bad">✗ 0</b></span>
+      </div>
+    </div>
+
+    <div class="chips" id="chips"></div>
+    <div class="warn" id="story-warn" hidden>⚠ 이야기 순서가 섞입니다</div>
+
+    <main id="study-main">
+      <div class="card-scene" id="scene">
+        <div class="card" id="card" aria-label="플래시카드 — 클릭하거나 Space 로 뒤집는다">
+          <div class="face front" id="face-front"></div>
+          <div class="face back" id="face-back"></div>
+        </div>
+      </div>
+      <div class="actions" id="actions">
+        <button class="nav" id="nav-prev" aria-label="이전 카드 (왼쪽 화살표)" title="이전 (←)">←</button>
+        <button class="know no" id="btn-no" aria-label="몰라요 (2)">✗ 몰라요<kbd>2</kbd></button>
+        <button class="know yes" id="btn-yes" aria-label="알아요 (1)">✓ 알아요<kbd>1</kbd></button>
+        <button class="nav" id="nav-next" aria-label="다음 카드 (오른쪽 화살표)" title="다음 (→)">→</button>
+      </div>
+    </main>
+
+    <section class="summary" id="summary" hidden>
+      <div class="gauge" id="gauge"><span id="gauge-num">0%</span></div>
+      <h2 id="sum-title">한 바퀴 완료</h2>
+      <p class="sline" id="sum-line"></p>
+      <div class="btns">
+        <button class="btn" id="btn-again" hidden>모르는 카드만 다시</button>
+        <button class="btn ghost" id="btn-restart">처음부터</button>
+      </div>
+    </section>
+  </section>
+
+  <!-- ===== 퀴즈 ===== -->
+  <section id="view-quiz" class="quiz" hidden></section>
+
+</div>
+
+<footer class="kbd-hint">Space 뒤집기 · ←→ 이동 · 1 알아요 · 2 몰라요 · S 셔플 · P 프레젠테이션 · 이미지·다이어그램 클릭 확대(0 원래 크기)</footer>
+
+<!-- ===== 프레젠테이션 오버레이 ===== -->
+<section class="present title" id="present">
+  <div class="p-title">
+    <div class="p-title-main" id="p-title-main"></div>
+    <div class="p-title-sub" id="p-title-sub"></div>
+    <div class="p-title-count" id="p-title-count"></div>
+  </div>
+  <div class="p-body">
+    <div class="p-cat" id="p-cat"></div>
+    <div class="p-ctx" id="p-ctx"></div>
+    <div class="p-front" id="p-front"></div>
+    <div class="p-hint">Space / 클릭 — 답 공개</div>
+    <div class="p-back" id="p-back"></div>
+    <div class="p-zoom-hint" id="p-zoom-hint" hidden>🔍 클릭하면 확대 · 다시 클릭하면 더 크게 · 스크롤·드래그로 이동</div>
+  </div>
+  <div class="p-meta" id="p-meta"></div>
+  <div class="p-bar" id="p-bar"></div>
+  <div class="p-controls">
+    <button id="p-play" aria-label="자동재생 켜기·끄기 (A)" title="자동재생 (A)">▶</button>
+    <button id="p-exit" aria-label="프레젠테이션 종료 (Esc)" title="종료 (Esc)">✕</button>
+  </div>
+</section>
+
+<div class="zoom-badge" id="zoom-badge" hidden></div>
+
+<script>
+/* ==========================================================================
+   1. 설정 & 카드 데이터  —  ★ 이 블록만 교체하면 새 덱이 된다
+   ========================================================================== */
+const CONFIG = {
+  id: 'flashcards-sample-v1',   // localStorage 키. 내용을 크게 바꾸면 v2로 올린다
+  title: '샘플 덱',
+  subtitle: '이 블록을 실제 주제로 교체하세요',
+  story: false,        // true면 스토리라인 덱 — 셔플 기본 OFF + 셔플 시 경고 배지
+  quiz: 'auto',        // 'off' | 'auto'(basic=객관식, cloze=빈칸타이핑) | 'choice' | 'typing'
+  reverse: false,      // true면 "뒤→앞" 방향 전환 버튼 노출 (외국어 단어장 등)
+  autoplaySec: 6,      // 프레젠테이션 자동재생 간격(초)
+};
+
+const DECK = [
+  { id: 1, type: 'basic', category: '개념',
+    front: '클로저(closure)란?',
+    back: '함수가 선언될 때의 **렉시컬 스코프**를 기억하는 함수.',
+    note: '내부 함수가 외부 변수를 참조하면 GC되지 않는다.' },
+
+  { id: 2, type: 'cloze',
+    category: '문법',
+    // cloze는 front/back 대신 text 하나. {{정답}}이 빈칸이 된다 (여러 개 가능)
+    text: '클로저는 함수가 선언될 때의 {{렉시컬 스코프}}를 기억하며, 참조된 외부 변수는 {{GC}}되지 않는다.' },
+
+  { id: 3, type: 'sequence', category: '개념',
+    front: '이벤트 루프 처리 순서는?',
+    items: ['콜 스택 비움', '마이크로태스크 큐 소진', '렌더링', '매크로태스크 1개'] },
+
+  { id: 4, type: 'basic', category: '문법',
+    front: '즉시실행함수(IIFE) 문법은?',
+    back: '```js\n(function () {\n  // ...\n})();\n```',
+    note: '스코프를 격리해 전역 오염을 막는다.' },
+
+  { id: 5, type: 'basic', category: '함정',
+    front: '`var`로 만든 반복문 클로저가 마지막 값만 출력하는 이유는?',
+    back: '`var`는 **함수 스코프**라 모든 콜백이 같은 변수 하나를 공유한다.',
+    note: '`let`은 블록마다 새 바인딩을 만들어 해결된다.',
+    choices: ['호이스팅이 일어나지 않아서', '콜백이 동기 실행되어서', '클로저가 생성되지 않아서'] },
+];
+
+/* ==========================================================================
+   2. markdown 미니 렌더러 (외부 파서 없음)
+      지원: **굵게** *기울임* `코드` ![img](src) / ```코드블록``` - 목록 1. 목록 --- 문단
+      규칙: 코드블록 추출 → 전체 이스케이프 → 블록 파싱 → 인라인 치환 → 코드블록 복원
+      플레이스홀더는 순수 ASCII 토큰만 (제어문자 금지 — 파일이 binary로 깨진다)
+   ========================================================================== */
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function inline(s) {
+  return String(s)
+    .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, function (m, alt, src) {
+      return '<img src="' + src.replace(/"/g, '') + '" alt="' + alt + '" loading="lazy">';
+    })
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+}
+
+function md(src) {
+  if (src == null || src === '') return '';
+  const blocks = [];
+  let text = String(src).replace(/```([a-zA-Z0-9_+-]*)\r?\n([\s\S]*?)```/g, function (m, lang, code) {
+    const tok = '@@CB' + blocks.length + '@@';
+    blocks.push({ lang: (lang || '').toLowerCase(), code: code.replace(/\r?\n$/, '') });
+    return '\n' + tok + '\n';
+  });
+  text = esc(text);
+
+  const lines = text.split(/\r?\n/), out = [];
+  let list = null, buf = [];
+  const flushP = function () { if (buf.length) { out.push('<p>' + inline(buf.join('<br>')) + '</p>'); buf = []; } };
+  const flushL = function () {
+    if (list) {
+      out.push('<' + list.tag + '>' + list.items.map(function (x) { return '<li>' + inline(x) + '</li>'; }).join('') + '</' + list.tag + '>');
+      list = null;
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    const cb = t.match(/^@@CB(\d+)@@$/);
+    if (cb) { flushP(); flushL(); out.push('@@CB' + cb[1] + '@@'); continue; }
+    if (!t) { flushP(); flushL(); continue; }
+    if (/^(-{3,}|_{3,}|\*{3,})$/.test(t)) { flushP(); flushL(); out.push('<hr>'); continue; }
+    const mu = t.match(/^[-*+]\s+(.*)$/);
+    if (mu) { flushP(); if (!list || list.tag !== 'ul') { flushL(); list = { tag: 'ul', items: [] }; } list.items.push(mu[1]); continue; }
+    const mo = t.match(/^\d+\.\s+(.*)$/);
+    if (mo) { flushP(); if (!list || list.tag !== 'ol') { flushL(); list = { tag: 'ol', items: [] }; } list.items.push(mo[1]); continue; }
+    flushL(); buf.push(t);
+  }
+  flushP(); flushL();
+
+  let html = out.join('\n');
+  blocks.forEach(function (b, i) {
+    const rep = b.lang === 'mermaid'
+      ? '<div class="mermaid-slot" data-src="' + esc(b.code) + '"><pre class="code">' + esc(b.code) + '</pre></div>'
+      : '<pre class="code">' + esc(b.code) + '</pre>';
+    html = html.split('@@CB' + i + '@@').join(rep);
+  });
+  return html;
+}
+
+/* markdown 서식을 벗긴 평문 — 퀴즈 보기·비교용 */
+function plain(s) {
+  return String(s == null ? '' : s)
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\*\*|\*|`|_{2,}/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+/* ---- cloze: 반드시 "ASCII 토큰 삽입 → md() → 토큰을 HTML로 치환" 왕복 패턴 ----
+   md()는 입력 전체를 이스케이프하므로 원시 HTML을 선주입하면 &lt;span…이 노출된다.
+   학습·프레젠테이션·퀴즈 세 모드가 아래 두 함수를 공유한다. */
+function clozeAnswers(text) {
+  const out = [], re = /\{\{([^}]+)\}\}/g;
+  let m;
+  while ((m = re.exec(String(text))) !== null) out.push(m[1].trim());
+  return out;
+}
+function renderClozeFront(text) {
+  const toks = [];
+  const marked = String(text).replace(/\{\{([^}]+)\}\}/g, function () {
+    const t = '@@BLANK' + toks.length + '@@'; toks.push(t); return t;
+  });
+  let html = md(marked);
+  toks.forEach(function (t) { html = html.split(t).join('<span class="blank">&nbsp;</span>'); });
+  return html;
+}
+function renderClozeBack(text) {
+  const toks = [];
+  const marked = String(text).replace(/\{\{([^}]+)\}\}/g, function (m, ans) {
+    const t = '@@BLANK' + toks.length + '@@'; toks.push({ t: t, ans: ans.trim() }); return t;
+  });
+  let html = md(marked);
+  toks.forEach(function (o) {
+    html = html.split(o.t).join('<mark class="filled">' + inline(esc(o.ans)) + '</mark>');
+  });
+  return html;
+}
+/* cloze 빈칸 입력창 버전 (퀴즈 전용) */
+function renderClozeInputs(text) {
+  const toks = [];
+  const marked = String(text).replace(/\{\{([^}]+)\}\}/g, function () {
+    const t = '@@BLANK' + toks.length + '@@'; toks.push(t); return t;
+  });
+  let html = md(marked);
+  toks.forEach(function (t, i) {
+    html = html.split(t).join('<input class="blank-in" data-bi="' + i + '" autocomplete="off">');
+  });
+  return html;
+}
+
+/* ==========================================================================
+   3. mermaid (CDN이 포함됐을 때만 동작 — 없으면 코드블록으로 폴백)
+   ========================================================================== */
+const isDark = function () {
+  return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+};
+let mermaidReady = false, mmdSeq = 0;
+const mmdCache = {};
+function renderMermaid(root, done) {
+  if (!root || !window.mermaid) return;
+  if (!mermaidReady) {
+    try { mermaid.initialize({ startOnLoad: false, theme: isDark() ? 'dark' : 'neutral' }); mermaidReady = true; }
+    catch (e) { return; }
+  }
+  Array.prototype.forEach.call(root.querySelectorAll('.mermaid-slot'), function (slot) {
+    if (slot.dataset.done) return;
+    const src = slot.dataset.src;
+    if (mmdCache[src]) { slot.innerHTML = mmdCache[src]; slot.dataset.done = '1'; if (done) done(); return; }
+    /* flip 뒷면은 rotateY(180deg) 상태라 크기 계산이 어긋난다 → 측정용 컨테이너에서 렌더 후 SVG만 이식 */
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:760px;visibility:hidden';
+    document.body.appendChild(probe);
+    const cleanup = function () { if (probe.parentNode) probe.parentNode.removeChild(probe); };
+    try {
+      Promise.resolve(mermaid.render('mmd-' + (++mmdSeq), src, probe)).then(function (res) {
+        const svg = typeof res === 'string' ? res : (res && res.svg);
+        if (svg) { mmdCache[src] = svg; slot.innerHTML = svg; slot.dataset.done = '1'; if (done) done(); }
+      })['catch'](function () { /* 실패 시 코드블록 폴백 유지 */ })
+        .then(cleanup, cleanup);
+    } catch (e) { cleanup(); }
+  });
+}
+
+/* ==========================================================================
+   4. 상태 & localStorage
+   ========================================================================== */
+const $ = function (id) { return document.getElementById(id); };
+const byId = {};
+DECK.forEach(function (c) { byId[c.id] = c; });
+
+const state = {
+  order: [],            // 현재 순회 순서 (카테고리 필터·셔플·오답덱 반영된 id 배열)
+  index: 0,
+  flipped: false,
+  known: {},            // id → true(알아요) / false(몰라요) / undefined(미분류)
+  shuffled: false,
+  reverse: false,
+  cat: 'all',
+  review: false,        // true면 order가 "몰라요" 카드만
+};
+
+function save() {
+  try {
+    localStorage.setItem(CONFIG.id, JSON.stringify({
+      known: state.known, lastIndex: state.index,
+      shuffled: state.shuffled, reverse: state.reverse, cat: state.cat
+    }));
+  } catch (e) {}
+}
+function load() {
+  try { return JSON.parse(localStorage.getItem(CONFIG.id)) || {}; } catch (e) { return {}; }
+}
+
+/* ==========================================================================
+   4-b. 제자리 확대 — 이미지·mermaid 다이어그램을 "그 화면 그대로" 키우고 스크롤로 본다
+        별도 오버레이를 띄우지 않으므로 발표 흐름·카드 상태가 전혀 흔들리지 않는다.
+        클릭할수록 단계적으로 커지고, 마지막 단계에서 한 번 더 누르면 원래 크기로 돌아온다.
+   ========================================================================== */
+const ZOOM_STEPS = [1, 1.8, 3];
+const zoom = { el: null, step: 0, dragged: false };
+const zoomOn = function () { return !!zoom.el; };
+
+function zoomScroller(el) {
+  return el.closest('.p-back, .p-front, .face, .qcard');   /* 스크롤을 담당하는 조상 */
+}
+function zoomBadge(text) {
+  const b = $('zoom-badge');
+  b.hidden = !text;
+  if (!text) return;
+  b.textContent = text;
+  /* 발표 중에는 present 요소만 풀스크린이므로 그 안으로 옮겨야 배지가 보인다 */
+  const host = document.fullscreenElement || document.body;
+  if (b.parentNode !== host) host.appendChild(b);
+}
+
+/* step 0이면 원래 크기로 되돌리고, 그 외에는 기준 크기 × 배율로 키운다 */
+function zoomApply(el, step) {
+  const host = zoomScroller(el), slot = el.closest('.mermaid-slot');
+  if (!step) {
+    el.style.width = el.dataset.zw0 || '';
+    el.style.height = el.dataset.zh0 || '';
+    el.style.maxWidth = el.dataset.zmw0 || '';
+    el.style.maxHeight = el.dataset.zmh0 || '';
+    el.classList.remove('zoomed');
+    if (host) host.classList.remove('zoom-scroll');
+    if (slot) slot.classList.remove('zoom-scroll');
+    zoomBadge('');
+    $('p-zoom-hint').style.visibility = '';
+    return;
+  }
+  const k = ZOOM_STEPS[step];
+  el.style.maxWidth = 'none'; el.style.maxHeight = 'none';
+  el.style.width = (parseFloat(el.dataset.zw) * k) + 'px';
+  el.style.height = (parseFloat(el.dataset.zh) * k) + 'px';
+  el.classList.add('zoomed');
+  if (host) host.classList.add('zoom-scroll');
+  if (slot) slot.classList.add('zoom-scroll');
+  zoomBadge('확대 ' + k + '× — 클릭·0 원래 크기, 스크롤·드래그 이동');
+  $('p-zoom-hint').style.visibility = 'hidden';        /* 배지가 안내를 대신한다 */
+}
+
+function zoomReset() {
+  if (!zoom.el) return;
+  zoomApply(zoom.el, 0);
+  zoom.el = null; zoom.step = 0;
+}
+
+function zoomToggle(el) {
+  if (zoom.el && zoom.el !== el) zoomReset();
+  if (!zoom.step) {
+    /* 확대를 시작하는 순간의 렌더 크기를 기준으로 잡는다 (화면 크기·카드마다 달라지므로 캐시하지 않는다) */
+    const r = el.getBoundingClientRect();
+    el.dataset.zw = r.width; el.dataset.zh = r.height;
+    el.dataset.zw0 = el.style.width; el.dataset.zh0 = el.style.height;
+    el.dataset.zmw0 = el.style.maxWidth; el.dataset.zmh0 = el.style.maxHeight;
+  }
+  zoom.el = el;
+  zoom.step = (zoom.step + 1) % ZOOM_STEPS.length;
+  zoomApply(el, zoom.step);
+  if (!zoom.step) { zoom.el = null; return; }
+  if (el.scrollIntoView) el.scrollIntoView({ block: 'center', inline: 'center' });
+}
+
+/* 카드 flip / 프레젠테이션 "다음"으로 전파되기 전에 캡처 단계에서 가로챈다 */
+document.addEventListener('click', function (e) {
+  if (!e.target.closest) return;
+  const media = e.target.closest('img, .mermaid-slot svg');
+  if (!media || !media.closest('.face, .p-front, .p-back, .qcard')) return;
+  e.preventDefault(); e.stopPropagation();
+  if (zoom.dragged) { zoom.dragged = false; return; }   /* 드래그 끝의 클릭은 배율을 바꾸지 않는다 */
+  zoomToggle(media);
+}, true);
+
+/* 확대된 상태에서 드래그로 훑어보기 — 스크롤 컨테이너를 직접 움직인다 */
+(function () {
+  let host = null, px = 0, py = 0, moved = 0;
+  document.addEventListener('mousedown', function (e) {
+    if (!zoom.el || !e.target.closest || !e.target.closest('.zoomed')) return;
+    host = zoomScroller(zoom.el);
+    if (!host) return;
+    e.preventDefault();
+    px = e.clientX; py = e.clientY; moved = 0;
+    document.body.style.cursor = 'grabbing';
+  }, true);
+  window.addEventListener('mousemove', function (e) {
+    if (!host) return;
+    host.scrollLeft -= e.clientX - px;
+    host.scrollTop -= e.clientY - py;
+    moved += Math.abs(e.clientX - px) + Math.abs(e.clientY - py);
+    px = e.clientX; py = e.clientY;
+  });
+  window.addEventListener('mouseup', function () {
+    if (!host) return;
+    zoom.dragged = moved > 6;
+    host = null;
+    document.body.style.cursor = '';
+  });
+})();
+
+/* ==========================================================================
+   5. 덱 순회 (카테고리 · 셔플 · 오답덱)
+   ========================================================================== */
+function categories() {
+  const seen = [];
+  DECK.forEach(function (c) { if (c.category && seen.indexOf(c.category) < 0) seen.push(c.category); });
+  return seen;
+}
+function inCat(c) { return state.cat === 'all' || c.category === state.cat; }
+function shuffleArr(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+/* sequence 카드용 시드 고정 셔플 — 재방문 시 같은 배치 */
+function seededShuffle(arr, seed) {
+  const a = arr.slice();
+  let s = (seed || 1) * 9301 + 49297;
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (s * 9301 + 49297) % 233280;
+    const j = Math.floor(s / 233280 * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+function buildOrder(keepIndex) {
+  let ids;
+  if (state.review && state.order.length) {
+    ids = state.order.slice();        /* 복습 덱은 진입 시 확정된 목록을 유지 (known을 비웠으므로 재필터 금지) */
+  } else {
+    ids = DECK.filter(inCat).map(function (c) { return c.id; });
+    if (state.review) ids = ids.filter(function (id) { return state.known[id] === false; });
+  }
+  if (state.shuffled) shuffleArr(ids);
+  state.order = ids;
+  if (!keepIndex || state.index >= ids.length) state.index = 0;
+}
+function current() { return byId[state.order[state.index]]; }
+
+/* ==========================================================================
+   6. 카드 렌더
+   ========================================================================== */
+function frontHTML(card) {
+  const parts = [];
+  if (card.category && categories().length > 1) parts.push('<span class="cat-badge">' + esc(card.category) + '</span>');
+  if (card.context) parts.push('<div class="ctx">' + md(card.context) + '</div>');
+
+  if (card.type === 'cloze') {
+    parts.push('<div class="q small">' + renderClozeFront(card.text) + '</div>');
+  } else if (card.type === 'sequence') {
+    parts.push('<div class="q small">' + md(card.front) + '</div>');
+    parts.push('<div class="seq-items">' + seededShuffle(card.items || [], card.id)
+      .map(function (it) { return '<span class="seq-item">' + inline(esc(it)) + '</span>'; }).join('') + '</div>');
+  } else {
+    parts.push('<div class="q">' + md(state.reverse ? card.back : card.front) + '</div>');
+  }
+  parts.push('<div class="flip-hint">클릭 · Space — 답 보기</div>');
+  return parts.join('');
+}
+
+function backHTML(card) {
+  const parts = [];
+  if (card.type === 'cloze') {
+    parts.push('<div class="back-a">' + renderClozeBack(card.text) + '</div>');
+  } else if (card.type === 'sequence') {
+    parts.push('<div class="back-q">' + plain(card.front) + '</div>');
+    parts.push('<div class="back-a"><ol>' + (card.items || [])
+      .map(function (it) { return '<li>' + inline(esc(it)) + '</li>'; }).join('') + '</ol></div>');
+  } else {
+    parts.push('<div class="back-q">' + plain(state.reverse ? card.back : card.front) + '</div>');
+    parts.push('<div class="back-a">' + md(state.reverse ? card.front : card.back) + '</div>');
+  }
+  if (card.note) parts.push('<div class="note">' + md(card.note) + '</div>');
+  return parts.join('');
+}
+
+function render() {
+  zoomReset();                                  /* 카드가 바뀌면 확대 상태는 초기화 */
+  if (!state.order.length) { showSummary(); return; }
+  $('summary').hidden = true;
+  $('study-main').hidden = false;
+
+  const card = current();
+  state.flipped = false;
+  $('card').classList.remove('flipped');
+  $('actions').classList.remove('live');
+  $('face-front').innerHTML = frontHTML(card);
+  $('face-back').innerHTML = backHTML(card);
+
+  /* 이동 애니메이션 */
+  const scene = $('scene');
+  scene.animate
+    ? scene.animate([{ opacity: .35, transform: 'translateX(12px)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'ease-out' })
+    : null;
+
+  updateProgress();
+  save();
+}
+
+function updateProgress() {
+  const total = state.order.length;
+  $('pos').textContent = total ? (state.index + 1) + ' / ' + total : '0 / 0';
+  $('bar-fill').style.width = total ? ((state.index + (state.flipped ? 1 : 0.4)) / total * 100) + '%' : '0%';
+  let ok = 0, bad = 0;
+  DECK.filter(inCat).forEach(function (c) {
+    if (state.known[c.id] === true) ok++;
+    else if (state.known[c.id] === false) bad++;
+  });
+  $('cnt-ok').textContent = '✓ ' + ok;
+  $('cnt-bad').textContent = '✗ ' + bad;
+}
+
+function flip(force) {
+  zoomReset();
+  state.flipped = (force === undefined) ? !state.flipped : !!force;
+  $('card').classList.toggle('flipped', state.flipped);
+  $('actions').classList.toggle('live', state.flipped);   /* flip 전에는 알아요/몰라요 비활성 */
+  if (state.flipped) renderMermaid($('face-back'));
+  updateProgress();
+}
+
+function go(delta) {
+  const next = state.index + delta;
+  if (next < 0 || next >= state.order.length) return;
+  state.index = next;
+  render();
+}
+
+function classify(isKnown) {
+  if (!state.flipped || !state.order.length) return;
+  state.known[current().id] = isKnown;
+  save();
+  if (state.index >= state.order.length - 1) { state.index = state.order.length - 1; showSummary(); }
+  else go(1);
+}
+
+/* ==========================================================================
+   7. 완료 화면
+   ========================================================================== */
+function showSummary() {
+  const pool = state.order.length ? state.order : DECK.filter(inCat).map(function (c) { return c.id; });
+  let ok = 0, bad = 0;
+  pool.forEach(function (id) {
+    if (state.known[id] === true) ok++;
+    else if (state.known[id] === false) bad++;
+  });
+  const done = ok + bad;
+  const rate = done ? Math.round(ok / done * 100) : 0;
+
+  $('gauge').style.background = 'conic-gradient(' + (bad === 0 && ok > 0 ? 'var(--ok)' : 'var(--accent)')
+    + ' 0 ' + rate + '%, rgba(127,127,127,.15) ' + rate + '% 100%)';
+  $('gauge-num').textContent = rate + '%';
+  $('sum-title').textContent = (bad === 0 && ok > 0) ? '전부 외웠어요 🎉' : (state.review ? '복습 한 바퀴 완료' : '한 바퀴 완료');
+  $('sum-line').innerHTML = '<b class="ok" style="color:var(--ok)">✓ ' + ok + '</b> · <b style="color:var(--bad)">✗ ' + bad + '</b> · 총 ' + pool.length + '장';
+  $('btn-again').hidden = bad === 0;
+  $('study-main').hidden = true;
+  $('summary').hidden = false;
+  $('bar-fill').style.width = '100%';
+}
+
+function reviewWrong() {
+  const ids = DECK.filter(inCat).filter(function (c) { return state.known[c.id] === false; })
+    .map(function (c) { return c.id; });
+  if (!ids.length) return;
+  ids.forEach(function (id) { delete state.known[id]; });   /* 재분류를 위해 리셋 */
+  state.review = true;
+  state.order = state.shuffled ? shuffleArr(ids) : ids;     /* known을 지웠으므로 order를 직접 구성 */
+  state.index = 0;
+  save();
+  render();
+}
+function restart(clearKnown) {
+  if (clearKnown) state.known = {};
+  state.review = false;
+  buildOrder(false);
+  save();
+  render();
+}
+
+/* ==========================================================================
+   8. 퀴즈 모드
+      basic → 객관식(4지선다) 또는 주관식 타이핑 / cloze → 빈칸 타이핑
+      sequence·mermaid 카드는 자동 출제에서 제외 (보기 생성이 어색해진다)
+   ========================================================================== */
+const hasMermaid = function (c) { return /```mermaid/.test(c.back || ''); };
+function quizMode(card) {
+  if (CONFIG.quiz === 'off') return null;
+  if (card.type === 'cloze') return 'blank';
+  if (card.type === 'sequence' || hasMermaid(card)) return null;
+  /* 답이 코드블록·이미지뿐이면 보기/타이핑 모두 성립하지 않는다 → 출제 제외 */
+  if (!plain(card.back)) return null;
+  if (CONFIG.quiz === 'typing') return 'typing';
+  /* 오답 보기를 2개 이상 못 만들면(덱이 작거나 답이 코드뿐) 객관식이 성립하지 않는다 → 주관식으로 폴백 */
+  return distractors(card, 3).length >= 2 ? 'choice' : 'typing';
+}
+function quizPool() { return DECK.filter(inCat).filter(function (c) { return quizMode(c); }); }
+/* distractors()는 아래에 선언되어 있다 — 함수 선언 호이스팅에 의존한다 */
+
+const quiz = { list: [], i: 0, score: 0, wrong: [], locked: false };
+
+function startQuiz() {
+  quiz.list = shuffleArr(quizPool().slice());
+  quiz.i = 0; quiz.score = 0; quiz.wrong = []; quiz.locked = false;
+  renderQuiz();
+}
+
+function distractors(card, n) {
+  const answer = plain(card.back);
+  const pool = DECK.filter(function (c) {
+    return c.id !== card.id && c.type !== 'cloze' && c.type !== 'sequence' && !hasMermaid(c) && c.back;
+  }).map(function (c) { return plain(c.back); })
+    .filter(function (t) { return t && t !== answer; });
+  const uniq = [];
+  pool.forEach(function (t) { if (uniq.indexOf(t) < 0) uniq.push(t); });
+  /* 길이가 비슷한 오답 우선 — 정답이 유독 길거나 짧아서 티나는 것을 막는다 */
+  uniq.sort(function (a, b) { return Math.abs(a.length - answer.length) - Math.abs(b.length - answer.length); });
+  const extra = (card.choices || []).map(plain).filter(Boolean);
+  return extra.concat(uniq).slice(0, n);
+}
+
+function normalize(s) {
+  return plain(s).toLowerCase().replace(/[\s.,!?;:'"()[\]{}·]/g, '');
+}
+
+function renderQuiz() {
+  const box = $('view-quiz');
+  if (!quiz.list.length) {
+    box.innerHTML = '<div class="qcard"><div class="qstem">출제할 카드가 없습니다.</div>'
+      + '<p class="ans-tip">이 카테고리에는 자동 출제 가능한 카드가 없습니다. 카드 학습 탭을 이용하세요.</p></div>';
+    return;
+  }
+  if (quiz.i >= quiz.list.length) { renderQuizResult(); return; }
+
+  const card = quiz.list[quiz.i];
+  const mode = quizMode(card);
+  const head = '<div class="pmeta"><span>' + (quiz.i + 1) + ' / ' + quiz.list.length
+    + '</span><span>점수 ' + quiz.score + '</span></div>'
+    + '<div class="bar"><i style="width:' + (quiz.i / quiz.list.length * 100) + '%"></i></div>';
+
+  if (mode === 'choice') {
+    const correct = plain(card.back);
+    const opts = shuffleArr([correct].concat(distractors(card, 3)));   /* 항상 3개 이상 (quizMode가 보장) */
+    box.innerHTML = head + '<div class="qcard"><div class="qstem">' + md(card.front) + '</div><div class="opts">'
+      + opts.map(function (o, i) { return '<button class="opt" data-i="' + i + '">' + esc(o) + '</button>'; }).join('')
+      + '</div><div class="ans-tip" hidden></div></div>';
+    Array.prototype.forEach.call(box.querySelectorAll('.opt'), function (btn, i) {
+      btn.addEventListener('click', function () {
+        if (quiz.locked) return;
+        quiz.locked = true;
+        const good = opts[i] === correct;
+        Array.prototype.forEach.call(box.querySelectorAll('.opt'), function (b, j) {
+          b.disabled = true;
+          if (opts[j] === correct) b.classList.add('correct');
+          else if (j === i) b.classList.add('wrong');
+        });
+        settle(card, good);
+      });
+    });
+  } else if (mode === 'typing') {
+    box.innerHTML = head + '<div class="qcard"><div class="qstem">' + md(card.front) + '</div>'
+      + '<input class="qinput" id="q-in" placeholder="답을 입력하고 Enter" autocomplete="off">'
+      + '<div class="ans-tip" hidden></div></div>';
+    const input = $('q-in');
+    input.focus();
+    input.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || quiz.locked) return;
+      quiz.locked = true;
+      const good = normalize(input.value) === normalize(card.back) && normalize(input.value) !== '';
+      input.classList.add(good ? 'correct' : 'wrong');
+      input.disabled = true;
+      const tip = box.querySelector('.ans-tip');
+      tip.hidden = false;
+      tip.innerHTML = good ? '정답!' : '정답: <b>' + esc(plain(card.back)) + '</b>';
+      settle(card, good);
+    });
+  } else { /* blank — cloze 빈칸 타이핑 */
+    const answers = clozeAnswers(card.text);
+    box.innerHTML = head + '<div class="qcard"><div class="qstem">' + renderClozeInputs(card.text) + '</div>'
+      + '<div class="btns" style="justify-content:flex-start"><button class="btn" id="q-submit">확인 (Enter)</button></div>'
+      + '<div class="ans-tip" hidden></div></div>';
+    const inputs = Array.prototype.slice.call(box.querySelectorAll('.blank-in'));
+    if (inputs[0]) inputs[0].focus();
+    const submit = function () {
+      if (quiz.locked) return;
+      quiz.locked = true;
+      let allGood = true;
+      inputs.forEach(function (inp, i) {
+        const good = normalize(inp.value) === normalize(answers[i]) && normalize(inp.value) !== '';
+        inp.classList.add(good ? 'correct' : 'wrong');
+        inp.disabled = true;
+        if (!good) allGood = false;
+      });
+      const tip = box.querySelector('.ans-tip');
+      tip.hidden = false;
+      tip.innerHTML = allGood ? '전부 정답!' : '정답: <b>' + answers.map(esc).join(' / ') + '</b>';
+      settle(card, allGood);
+    };
+    $('q-submit').addEventListener('click', submit);
+    inputs.forEach(function (inp) {
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    });
+  }
+}
+
+/* 정오 처리 → 0.9s 후 다음 문제. 틀린 문제는 카드 학습의 "몰라요"로 반영 */
+function settle(card, good) {
+  if (good) quiz.score++;
+  else { quiz.wrong.push(card); state.known[card.id] = false; save(); }
+  setTimeout(function () { quiz.i++; quiz.locked = false; renderQuiz(); }, 900);
+}
+
+function renderQuizResult() {
+  const total = quiz.list.length;
+  const rate = total ? Math.round(quiz.score / total * 100) : 0;
+  $('view-quiz').innerHTML = '<div class="summary" style="box-shadow:var(--shadow)">'
+    + '<div class="gauge" style="background:conic-gradient(' + (quiz.wrong.length ? 'var(--accent)' : 'var(--ok)')
+    + ' 0 ' + rate + '%, rgba(127,127,127,.15) ' + rate + '% 100%)"><span>' + rate + '%</span></div>'
+    + '<h2>' + quiz.score + ' / ' + total + ' 정답</h2>'
+    + (quiz.wrong.length
+      ? '<p class="sline">틀린 문제는 카드 학습의 <b>몰라요</b>로 반영했습니다.</p><ul class="wrong-list">'
+        + quiz.wrong.map(function (c) { return '<li>' + esc(plain(c.front || c.text)) + '</li>'; }).join('') + '</ul>'
+      : '<p class="sline">전부 맞혔어요 🎉</p>')
+    + '<div class="btns" style="margin-top:20px"><button class="btn" id="q-retry">다시 풀기</button>'
+    + '<button class="btn ghost" id="q-to-study">카드 학습으로</button></div></div>';
+  $('q-retry').addEventListener('click', startQuiz);
+  $('q-to-study').addEventListener('click', function () { setView('study'); });
+}
+
+/* ==========================================================================
+   9. 프레젠테이션 모드 (학습 상태와 완전 독립 — 아무것도 기록하지 않는다)
+   ========================================================================== */
+const pres = { on: false, title: true, i: 0, revealed: false, timer: null, order: [] };
+const presEl = $('present');
+
+function presEnter() {
+  pres.order = state.order.slice();
+  if (!pres.order.length) return;
+  pres.on = true; pres.title = true; pres.revealed = false;
+  pres.i = Math.min(state.index, pres.order.length - 1);
+  presEl.classList.add('on', 'title');
+  presEl.classList.remove('revealed', 'has-media');
+  $('p-title-main').textContent = CONFIG.title;
+  $('p-title-sub').textContent = CONFIG.subtitle || '';
+  $('p-title-count').textContent = '플래시카드 ' + pres.order.length + '장';
+  $('p-meta').textContent = pres.order.length + '장';
+  $('p-bar').style.width = '0%';
+  if (presEl.requestFullscreen) { try { presEl.requestFullscreen(); } catch (e) {} }
+  presPaint();
+}
+
+function presExit() {
+  zoomReset();
+  pres.on = false;
+  presAutoplay(false);
+  presEl.classList.remove('on', 'revealed', 'title', 'has-media');
+  if (document.fullscreenElement) { try { document.exitFullscreen(); } catch (e) {} }
+}
+
+function presPaint() {
+  zoomReset();                                  /* 카드가 바뀌면 확대 상태는 초기화 */
+  presEl.classList.toggle('title', pres.title);
+  if (pres.title) { $('p-bar').style.width = '0%'; return; }
+  const card = byId[pres.order[pres.i]];
+  const cat = (card.category && categories().length > 1) ? card.category : '';
+  $('p-cat').textContent = cat;
+  $('p-cat').hidden = !cat;
+  $('p-ctx').innerHTML = card.context ? md(card.context) : '';
+  $('p-ctx').hidden = !card.context;
+
+  if (card.type === 'cloze') {
+    $('p-front').innerHTML = renderClozeFront(card.text);
+    $('p-back').innerHTML = renderClozeBack(card.text) + (card.note ? '<div class="note">' + md(card.note) + '</div>' : '');
+  } else if (card.type === 'sequence') {
+    $('p-front').innerHTML = md(card.front) + '<div class="seq-items">' + seededShuffle(card.items || [], card.id)
+      .map(function (it) { return '<span class="seq-item">' + inline(esc(it)) + '</span>'; }).join('') + '</div>';
+    $('p-back').innerHTML = '<ol>' + (card.items || []).map(function (it) { return '<li>' + inline(esc(it)) + '</li>'; }).join('') + '</ol>'
+      + (card.note ? '<div class="note">' + md(card.note) + '</div>' : '');
+  } else {
+    $('p-front').innerHTML = md(state.reverse ? card.back : card.front);
+    $('p-back').innerHTML = md(state.reverse ? card.front : card.back)
+      + (card.note ? '<div class="note">' + md(card.note) + '</div>' : '');
+  }
+
+  /* 질문 길이에 맞춰 앞면 타이포 단계 결정 — 짧은 질문은 최대 크기, 긴 질문은 넘치지 않게 축소 */
+  const qLen = plain(card.type === 'cloze' ? card.text : (state.reverse && card.type !== 'sequence' ? card.back : card.front)).length;
+  const pf = $('p-front');
+  pf.classList.remove('len-m', 'len-l');
+  if (qLen > 90) pf.classList.add('len-l');
+  else if (qLen > 40) pf.classList.add('len-m');
+
+  presEl.classList.toggle('revealed', pres.revealed);
+  /* 답에 이미지·다이어그램이 있는지 — 레이아웃(상단 정렬 vs 중앙 정렬)을 가른다 */
+  presEl.classList.toggle('has-media', pres.revealed && !!$('p-back').querySelector('img, .mermaid-slot'));
+  $('p-zoom-hint').hidden = true;
+  if (pres.revealed) {
+    renderMermaid($('p-back'), presFitMedia);
+    requestAnimationFrame(presFitMedia);
+  }
+  $('p-meta').textContent = (pres.i + 1) + ' / ' + pres.order.length;
+  $('p-bar').style.width = ((pres.i + (pres.revealed ? 1 : 0.5)) / pres.order.length * 100) + '%';
+}
+
+/* 답 영역의 이미지·다이어그램을 "질문 영역이 쓰고 남은 높이"에 실제로 맞춘다.
+   vh 상수로는 질문 길이에 따라 넘치거나 남으므로, 렌더된 높이를 측정해 px로 지정한다.
+   더 크게 보려면 클릭 확대로 넘긴다. */
+function presFitMedia() {
+  if (!pres.on || !pres.revealed) return;
+  const back = $('p-back');
+  const media = Array.prototype.slice.call(back.querySelectorAll('img, .mermaid-slot svg'));
+  $('p-zoom-hint').hidden = !media.length;
+  if (!media.length) return;
+  /* scrollHeight는 넘치지 않으면 clientHeight로 고정되므로(남은 여백을 콘텐츠로 착각해 크기가 수렴한다)
+     자식 높이를 직접 합산해 "미디어를 뺀 콘텐츠 높이"를 구한다 */
+  const cs = getComputedStyle(back);
+  const inner = back.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+  let content = 0;
+  Array.prototype.forEach.call(back.children, function (ch) {
+    const s2 = getComputedStyle(ch);
+    content += ch.getBoundingClientRect().height + (parseFloat(s2.marginTop) || 0) + (parseFloat(s2.marginBottom) || 0);
+  });
+  const room = Math.max(140, inner - (content - media[0].getBoundingClientRect().height) - 6);
+  media.forEach(function (el) {
+    if (el.tagName.toLowerCase() === 'svg') {
+      /* viewBox 비율로 폭까지 직접 계산한다 — height만 주면 svg 박스 안에서 그림이 레터박스되어 작아진다 */
+      const vb = (el.getAttribute('viewBox') || '').split(/[\s,]+/).map(Number);
+      if (vb.length === 4 && vb[2] > 0 && vb[3] > 0) {
+        const ratio = vb[2] / vb[3];
+        let h = room, w = h * ratio;
+        const maxW = back.clientWidth;
+        if (w > maxW) { w = maxW; h = w / ratio; }
+        el.style.width = w + 'px'; el.style.height = h + 'px'; el.style.maxWidth = '100%'; el.style.maxHeight = h + 'px';
+      } else {
+        el.style.maxWidth = '100%'; el.style.width = 'auto'; el.style.height = room + 'px';
+      }
+    } else {
+      el.style.maxHeight = room + 'px';
+      if (!el.complete) el.addEventListener('load', presFitMedia, { once: true });
+    }
+  });
+}
+
+/* 2단계 진행: 앞면 → 공개 → 다음 카드 */
+function presNext() {
+  if (pres.title) { pres.title = false; pres.revealed = false; presPaint(); return; }
+  if (!pres.revealed) { pres.revealed = true; presPaint(); return; }
+  if (pres.i >= pres.order.length - 1) { presExit(); return; }
+  pres.i++; pres.revealed = false; presPaint();
+}
+function presPrev() {
+  if (pres.title) return;
+  if (pres.revealed) { pres.revealed = false; presPaint(); return; }
+  if (pres.i === 0) { pres.title = true; presPaint(); return; }
+  pres.i--; pres.revealed = true; presPaint();
+}
+function presAutoplay(on) {
+  const want = (on === undefined) ? !pres.timer : on;
+  if (pres.timer) { clearInterval(pres.timer); pres.timer = null; }
+  if (want) {
+    pres.timer = setInterval(function () {
+      if (!pres.on) { presAutoplay(false); return; }
+      presNext();
+      if (!pres.on) presAutoplay(false);
+    }, Math.max(2, CONFIG.autoplaySec) * 1000);
+  }
+  $('p-play').textContent = pres.timer ? '❙❙' : '▶';
+}
+
+/* ==========================================================================
+   10. 뷰 전환 · 컨트롤 · 키보드 · 터치
+   ========================================================================== */
+function setView(v) {
+  $('view-study').hidden = v !== 'study';
+  $('view-quiz').hidden = v !== 'quiz';
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+    t.classList.toggle('active', t.dataset.view === v);
+  });
+  if (v === 'quiz') startQuiz();
+}
+
+function renderChips() {
+  const cats = categories();
+  const box = $('chips');
+  if (cats.length < 2) { box.hidden = true; return; }
+  const counts = {};
+  DECK.forEach(function (c) { counts[c.category] = (counts[c.category] || 0) + 1; });
+  box.innerHTML = '<button class="chip' + (state.cat === 'all' ? ' active' : '') + '" data-cat="all">전체 (' + DECK.length + ')</button>'
+    + cats.map(function (c) {
+      return '<button class="chip' + (state.cat === c ? ' active' : '') + '" data-cat="' + esc(c) + '">' + esc(c) + ' (' + counts[c] + ')</button>';
+    }).join('');
+  Array.prototype.forEach.call(box.querySelectorAll('.chip'), function (btn) {
+    btn.addEventListener('click', function () {
+      state.cat = btn.dataset.cat;
+      state.review = false;
+      renderChips(); buildOrder(false); render();
+    });
+  });
+}
+
+function toggleShuffle() {
+  state.shuffled = !state.shuffled;
+  $('btn-shuffle').classList.toggle('on', state.shuffled);
+  $('story-warn').hidden = !(CONFIG.story && state.shuffled);
+  buildOrder(false); save(); render();
+}
+function toggleReverse() {
+  state.reverse = !state.reverse;
+  $('btn-reverse').classList.toggle('on', state.reverse);
+  $('btn-reverse').textContent = state.reverse ? '⇄ 앞→뒤' : '⇄ 뒤→앞';
+  save(); render();
+}
+
+/* --- 이벤트 바인딩 --- */
+$('scene').addEventListener('click', function () { flip(); });
+$('nav-prev').addEventListener('click', function (e) { e.stopPropagation(); go(-1); });
+$('nav-next').addEventListener('click', function (e) { e.stopPropagation(); go(1); });
+$('btn-yes').addEventListener('click', function () { classify(true); });
+$('btn-no').addEventListener('click', function () { classify(false); });
+$('btn-again').addEventListener('click', reviewWrong);
+$('btn-restart').addEventListener('click', function () { restart(false); });
+$('btn-shuffle').addEventListener('click', toggleShuffle);
+$('btn-reverse').addEventListener('click', toggleReverse);
+$('btn-reset').addEventListener('click', function () {
+  if (confirm('학습 진행(알아요/몰라요)을 모두 지웁니다. 계속할까요?')) restart(true);
+});
+$('btn-present').addEventListener('click', presEnter);
+$('p-exit').addEventListener('click', function (e) { e.stopPropagation(); presExit(); });
+$('p-play').addEventListener('click', function (e) { e.stopPropagation(); presAutoplay(); });
+presEl.addEventListener('click', function (e) {
+  if (e.target.closest('.p-controls')) return;   /* 컨트롤 클릭이 "다음 진행"으로 전파되지 않게 */
+  presAutoplay(false);
+  presNext();
+});
+document.addEventListener('fullscreenchange', function () {
+  /* 풀스크린 중 Esc는 keydown이 안 잡히는 브라우저가 있어 이 경로가 필수 */
+  if (!document.fullscreenElement && pres.on) presExit();
+});
+Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+  t.addEventListener('click', function () { setView(t.dataset.view); });
+});
+
+/* --- 키보드: 프레젠테이션 활성 여부를 최상단에서 먼저 검사 --- */
+document.addEventListener('keydown', function (e) {
+  if (zoomOn() && (e.key === '0' || e.key === 'Escape')) {       /* 확대 중이면 먼저 원래 크기로 */
+    e.preventDefault(); zoomReset(); return;
+  }
+  if (zoomOn() && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_')) {
+    e.preventDefault(); zoomToggle(zoom.el); return;
+  }
+  if (pres.on) {
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); presAutoplay(false); presNext(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); presAutoplay(false); presPrev(); }
+    else if (e.key === 'a' || e.key === 'A') { e.preventDefault(); presAutoplay(); }
+    else if (e.key === 'Escape') { e.preventDefault(); presExit(); }
+    return;
+  }
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea') return;            /* 퀴즈 입력 중 단축키 차단 */
+  if ($('view-quiz').hidden === false) {
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); presEnter(); }
+    return;
+  }
+  if ($('summary').hidden === false) return;
+
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+  else if (e.key === '1') { classify(true); }
+  else if (e.key === '2') { classify(false); }
+  else if (e.key === 's' || e.key === 'S') { toggleShuffle(); }
+  else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); presEnter(); }
+});
+
+/* --- 터치: 탭=flip(scene click), 좌우 스와이프=이동 --- */
+(function () {
+  let x0 = null, y0 = null;
+  const scene = $('scene');
+  scene.addEventListener('touchstart', function (e) {
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+  }, { passive: true });
+  scene.addEventListener('touchend', function (e) {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    const dy = e.changedTouches[0].clientY - y0;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { go(dx < 0 ? 1 : -1); }
+    x0 = y0 = null;
+  }, { passive: true });
+})();
+
+/* ==========================================================================
+   11. 초기화
+   ========================================================================== */
+(function init() {
+  document.title = CONFIG.title + ' — 플래시카드';
+  $('deck-title').textContent = CONFIG.title;
+  $('deck-sub').textContent = (CONFIG.subtitle ? CONFIG.subtitle + ' · ' : '') + DECK.length + '장';
+
+  const saved = load();
+  state.known = saved.known || {};
+  state.cat = saved.cat || 'all';
+  state.reverse = !!saved.reverse;
+  state.shuffled = CONFIG.story ? false : !!saved.shuffled;
+
+  $('tabs').hidden = CONFIG.quiz === 'off' || quizPool().length === 0;
+  $('btn-reverse').hidden = !CONFIG.reverse;
+  if (state.reverse) { $('btn-reverse').classList.add('on'); $('btn-reverse').textContent = '⇄ 앞→뒤'; }
+  $('btn-shuffle').classList.toggle('on', state.shuffled);
+  $('story-warn').hidden = !(CONFIG.story && state.shuffled);
+
+  renderChips();
+  buildOrder(false);
+  state.index = Math.min(saved.lastIndex || 0, Math.max(0, state.order.length - 1));
+  render();
+})();
+</script>
+</body>
+</html>

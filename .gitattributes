@@ -1,0 +1,4 @@
+# 체크아웃 줄끝을 LF 로 고정한다 — 산출물 HTML 과 base.html 은 문자열 앵커로 교체되므로
+# CRLF 로 받으면 엔진의 줄 단위 정규식(mermaid CDN 줄 등)이 어긋난다.
+# 바이너리는 text 감지에서 제외되므로 안전하다.
+* text=auto eol=lf

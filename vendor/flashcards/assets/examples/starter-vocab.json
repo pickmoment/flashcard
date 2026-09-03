@@ -1,0 +1,87 @@
+{
+  "id": "flashcards-shapes-en-v1",
+  "title": "도형 이름 — 한국어 ↔ 영어",
+  "subtitle": "양방향 + 주관식 타이핑으로 표기까지 외운다",
+  "story": false,
+  "quiz": "typing",
+  "reverse": true,
+  "autoplaySec": 5,
+  "accent": "teal",
+  "ratio": "1/1",
+  "cards": [
+    {
+      "id": 1,
+      "type": "basic",
+      "category": "평면도형",
+      "front": "삼각형",
+      "back": "triangle"
+    },
+    {
+      "id": 2,
+      "type": "basic",
+      "category": "평면도형",
+      "front": "사각형",
+      "back": "quadrilateral",
+      "note": "정사각형은 square, 직사각형은 rectangle."
+    },
+    {
+      "id": 3,
+      "type": "basic",
+      "category": "평면도형",
+      "front": "마름모",
+      "back": "rhombus"
+    },
+    {
+      "id": 4,
+      "type": "basic",
+      "category": "평면도형",
+      "front": "부채꼴",
+      "back": "sector",
+      "note": "호(arc)와 두 반지름으로 둘러싸인 부분."
+    },
+    {
+      "id": 5,
+      "type": "basic",
+      "category": "입체도형",
+      "front": "원기둥",
+      "back": "cylinder"
+    },
+    {
+      "id": 6,
+      "type": "basic",
+      "category": "입체도형",
+      "front": "원뿔",
+      "back": "cone"
+    },
+    {
+      "id": 7,
+      "type": "basic",
+      "category": "입체도형",
+      "front": "정육면체",
+      "back": "cube"
+    },
+    {
+      "id": 8,
+      "type": "basic",
+      "category": "입체도형",
+      "front": "구",
+      "back": "sphere"
+    },
+    {
+      "id": 9,
+      "type": "basic",
+      "category": "그림 보고 답하기",
+      "front": "![도형 그림](data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20160%20120%22%3E%3Cpolygon%20points%3D%2280%2C16%20148%2C104%2012%2C104%22%20fill%3D%22none%22%20stroke%3D%22%25230f766e%22%20stroke-width%3D%227%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E)\n\n이 도형의 영어 이름은?",
+      "back": "triangle",
+      "note": "세 변으로 둘러싸인 평면도형."
+    },
+    {
+      "id": 10,
+      "type": "basic",
+      "category": "그림 보고 답하기",
+      "front": "![도형 그림](data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20160%20120%22%3E%3Cellipse%20cx%3D%2280%22%20cy%3D%2226%22%20rx%3D%2246%22%20ry%3D%2216%22%20fill%3D%22none%22%20stroke%3D%22%25230f766e%22%20stroke-width%3D%227%22%2F%3E%3Cpath%20d%3D%22M34%2026%20V94%20M126%2026%20V94%22%20stroke%3D%22%25230f766e%22%20stroke-width%3D%227%22%20fill%3D%22none%22%2F%3E%3Cpath%20d%3D%22M34%2094%20a46%2016%200%200%200%2092%200%22%20fill%3D%22none%22%20stroke%3D%22%25230f766e%22%20stroke-width%3D%227%22%2F%3E%3C%2Fsvg%3E)\n\n이 도형의 영어 이름은?",
+      "back": "cylinder",
+      "note": "두 밑면이 합동인 원이고 옆면이 굽은 입체도형."
+    }
+  ]
+}

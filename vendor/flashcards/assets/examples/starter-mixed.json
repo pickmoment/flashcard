@@ -1,0 +1,98 @@
+{
+  "id": "flashcards-git-mixed-v1",
+  "title": "Git — 개념과 절차",
+  "subtitle": "형식 세 가지를 한 덱에 섞은 예",
+  "story": false,
+  "quiz": "auto",
+  "reverse": false,
+  "autoplaySec": 7,
+  "accent": "amber",
+  "ratio": "7/5",
+  "cards": [
+    {
+      "id": 1,
+      "type": "basic",
+      "category": "개념",
+      "front": "커밋은 무엇을 저장하나?",
+      "back": "그 시점 **작업 트리 전체의 스냅샷**과 부모 커밋을 가리키는 포인터.",
+      "note": "변경분(diff)을 저장하는 것이 아니라 스냅샷을 저장한다."
+    },
+    {
+      "id": 2,
+      "type": "basic",
+      "category": "개념",
+      "front": "브랜치의 실체는?",
+      "back": "커밋 하나를 가리키는 **41바이트 파일**(해시 + 줄바꿈).",
+      "note": ".git/refs/heads/ 아래에 있다. 그래서 만들고 지우는 비용이 거의 없다."
+    },
+    {
+      "id": 3,
+      "type": "cloze",
+      "category": "개념",
+      "text": "`HEAD` 는 보통 현재 {{브랜치}} 를 가리키고, 브랜치를 거치지 않고 커밋을 직접 가리키는 상태를 {{detached HEAD}} 라고 한다."
+    },
+    {
+      "id": 4,
+      "type": "cloze",
+      "category": "명령",
+      "text": "스테이징 영역에 올리는 명령은 `git {{add}}` 이고, 스테이징을 되돌리는 명령은 `git {{restore --staged}}` 다."
+    },
+    {
+      "id": 5,
+      "type": "basic",
+      "category": "명령",
+      "front": "`git merge` 와 `git rebase` 의 차이는?",
+      "back": "merge 는 두 갈래를 합치는 **머지 커밋**을 만들고, rebase 는 커밋을 **다시 써서 한 줄로** 만든다.",
+      "note": "이미 밀어 올린 커밋을 rebase 하면 다른 사람의 히스토리와 어긋난다."
+    },
+    {
+      "id": 6,
+      "type": "basic",
+      "category": "명령",
+      "front": "`git reset --soft` 는 무엇만 움직이나?",
+      "back": "브랜치 포인터만 옮긴다 — 스테이징과 작업 트리는 그대로다.",
+      "note": "--mixed 는 스테이징까지, --hard 는 작업 트리까지 되돌린다."
+    },
+    {
+      "id": 7,
+      "type": "sequence",
+      "category": "절차",
+      "front": "변경을 원격에 올리는 순서는?",
+      "items": [
+        "git status 로 무엇이 바뀌었는지 본다",
+        "git add 로 올릴 것만 고른다",
+        "git commit 으로 스냅샷을 만든다",
+        "git pull --rebase 로 원격 변경을 얹는다",
+        "git push 로 올린다"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "sequence",
+      "category": "절차",
+      "front": "잘못 만든 마지막 커밋을 되돌리는 순서는?",
+      "items": [
+        "git log -1 로 되돌릴 커밋을 확인한다",
+        "git reset --soft HEAD~1 로 포인터만 되돌린다",
+        "고칠 파일을 다시 수정한다",
+        "git commit 으로 다시 커밋한다"
+      ]
+    },
+    {
+      "id": 9,
+      "type": "basic",
+      "category": "구조",
+      "front": "작업 트리에서 저장소까지 어떤 단계를 거치나?",
+      "back": "```mermaid\nflowchart LR\n  W[작업 트리] -->|git add| S[스테이징]\n  S -->|git commit| L[로컬 저장소]\n  L -->|git push| R[원격 저장소]\n  R -->|git fetch| L\n```",
+      "note": "git pull 은 fetch + merge(또는 rebase) 두 단계다."
+    },
+    {
+      "id": 10,
+      "type": "basic",
+      "category": "함정",
+      "front": "`git push --force` 가 위험한 이유는?",
+      "back": "원격의 커밋을 **덮어써서** 남이 이미 받아 간 히스토리를 지운다.",
+      "note": "--force-with-lease 는 남이 그사이 올린 것이 있으면 거부한다."
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "id": "flashcards-url-to-pixel-v1",
+  "title": "주소창에 URL 을 넣으면 무슨 일이 벌어지나",
+  "subtitle": "첫 픽셀이 그려지기까지 — 이야기 순서로 외운다",
+  "story": true,
+  "quiz": "auto",
+  "reverse": false,
+  "autoplaySec": 8,
+  "accent": "violet",
+  "ratio": "7/5",
+  "cards": [
+    {
+      "id": 1,
+      "type": "basic",
+      "category": "이름 찾기",
+      "context": "지금까지: 주소창에 도메인을 입력하고 엔터를 눌렀다.",
+      "front": "브라우저가 가장 먼저 알아내야 하는 것은?",
+      "back": "도메인에 해당하는 **IP 주소**. 캐시 → hosts 파일 → DNS 리졸버 순으로 찾는다.",
+      "note": "브라우저·OS·라우터·리졸버가 각각 캐시를 들고 있다."
+    },
+    {
+      "id": 2,
+      "type": "basic",
+      "category": "이름 찾기",
+      "context": "지금까지: IP 주소를 알아냈다.",
+      "front": "TCP 연결은 몇 번의 왕복으로 시작하나?",
+      "back": "**세 번의 handshake** — SYN, SYN-ACK, ACK.",
+      "note": "QUIC 은 이 과정을 UDP 위에서 합쳐 왕복을 줄인다."
+    },
+    {
+      "id": 3,
+      "type": "cloze",
+      "category": "연결",
+      "context": "지금까지: TCP 연결이 열렸다.",
+      "text": "HTTPS 라면 이어서 {{TLS}} 핸드셰이크로 인증서를 확인하고 {{세션 키}} 를 만든다."
+    },
+    {
+      "id": 4,
+      "type": "basic",
+      "category": "요청",
+      "context": "지금까지: 암호화된 통로가 열렸다.",
+      "front": "브라우저가 보내는 첫 요청의 모양은?",
+      "back": "메서드·경로·버전 한 줄과 **헤더들** — `GET / HTTP/1.1`, `Host`, `User-Agent`, `Accept`.",
+      "note": "쿠키가 있으면 여기에 실려 간다."
+    },
+    {
+      "id": 5,
+      "type": "basic",
+      "category": "응답",
+      "context": "지금까지: 요청이 서버에 도착했다.",
+      "front": "응답의 첫 줄에서 무엇을 읽나?",
+      "back": "**상태 코드** — 200 이면 본문이 오고, 3xx 면 다른 주소로 다시 요청한다.",
+      "note": "Content-Type 헤더가 본문을 무엇으로 해석할지 정한다."
+    },
+    {
+      "id": 6,
+      "type": "sequence",
+      "category": "렌더링",
+      "context": "지금까지: HTML 본문이 도착했다.",
+      "front": "화면이 그려지는 순서는?",
+      "items": [
+        "HTML 을 파싱해 DOM 트리를 만든다",
+        "CSS 를 파싱해 스타일을 계산한다",
+        "DOM 과 스타일을 합쳐 렌더 트리를 만든다",
+        "레이아웃으로 각 박스의 위치와 크기를 정한다",
+        "페인트로 픽셀을 칠하고 레이어를 합성한다"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "basic",
+      "category": "렌더링",
+      "context": "지금까지: 파싱 중에 <script> 를 만났다.",
+      "front": "일반 `<script>` 가 파싱을 멈추게 하는 이유는?",
+      "back": "스크립트가 DOM 을 바꿀 수 있으므로 **실행이 끝날 때까지** 파서가 기다린다.",
+      "note": "defer 는 파싱 후 실행, async 는 받는 즉시 실행한다."
+    },
+    {
+      "id": 8,
+      "type": "basic",
+      "category": "렌더링",
+      "context": "지금까지: 첫 화면이 그려졌다.",
+      "front": "이후 상호작용은 무엇이 처리하나?",
+      "back": "**이벤트 루프** — 콜 스택이 비면 마이크로태스크를 소진하고 렌더링 기회를 준다.",
+      "note": "긴 작업 하나가 이 순환을 막으면 화면이 멈춘 것처럼 보인다."
+    }
+  ]
+}
