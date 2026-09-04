@@ -73,6 +73,8 @@ export interface DeckStats {
   uncategorized: number;
   quiz: { choice: number; typing: number; blank: number; total: number };
   excludedFromQuiz: number;
+  /** quiz==='choice' 에서 오답이 3개를 못 채워 출제에서 빠진 basic 장수 */
+  choiceDropped: number;
   mermaid: number;
   images: number;
   externalImages: number;
@@ -122,10 +124,41 @@ export interface CheckResult {
   cards: number;
 }
 
+/** `parseImport` 의 열 역할. null 은 버리는 열. */
+export type ImportColumn = "front" | "back" | "category" | "note" | "context" | null;
+
+/** 읽지 못하고 버린 줄 — 사람이 원문에서 찾아 고칠 수 있게 위치와 이유를 남긴다. */
+export interface ImportDrop {
+  /** 원문 줄 번호 (1부터). 표 형식이면 행 번호 */
+  line: number;
+  text: string;
+  reason: string;
+}
+
 export interface ImportResult {
   cards: Card[];
+  /** 사람이 읽는 경고 문장 — 버린 줄 요약·답 없는 카드 등 */
   warnings: string[];
   format: "csv" | "tsv" | "md" | "anki";
+  /** 실제로 적용된 열 매핑 (표 형식). md 는 ['front','back'] */
+  columns: ImportColumn[];
+  /** 첫 줄을 머리글로 읽었는가 */
+  header: boolean;
+  /** 읽은 행(줄) 수 — 버린 줄 포함 */
+  rows: number;
+  dropped: ImportDrop[];
+}
+
+/** Rust `read_apkg` 가 돌려주는 Anki 패키지. 필드 값은 Anki 의 HTML 그대로다 — `FCD.ankiHtml` 로 옮긴다. */
+export interface ApkgImport {
+  deck_name: string | null;
+  notetypes: { id: string; name: string; fields: string[] }[];
+  notes: { notetype: string; fields: string[]; tags: string[] }[];
+  /** 미디어 파일명 → data URI. 이미지만 담는다 */
+  media: Record<string, string>;
+  /** 이미지가 아니라 뺀 미디어 개수 (소리·영상) */
+  skipped_media: number;
+  format: "anki2" | "anki21" | "anki21b";
 }
 
 export interface BuildOpts {
@@ -146,6 +179,12 @@ export interface PreviewHook {
   reveal(): void;
   category(c: string): string;
   reset(): void;
+  /**
+   * DECK 을 제자리에서 갈아끼우고 현재 카드를 다시 그린다 — 문서를 다시 로드하지 않으므로
+   * 학습 진행·스크롤·탭이 유지된다. CONFIG(제목·퀴즈 모드·색·비율)나 mermaid CDN 유무가
+   * 바뀌면 이걸로는 안 되고 문서를 다시 빌드해야 한다.
+   */
+  update(cards: Card[]): boolean;
   state(): {
     index: number;
     id: number | null;
@@ -177,7 +216,18 @@ export interface Engine {
   toHTML(spec: unknown, opts: BuildOpts): string;
   check(html: string): CheckResult;
 
-  parseImport(text: string, opts?: { format?: string; startId?: number }): ImportResult;
+  parseImport(
+    text: string,
+    opts?: { format?: string; startId?: number; columns?: ImportColumn[]; header?: "auto" | boolean },
+  ): ImportResult;
+  /** 이미 행으로 쪼개진 표(apkg 노트 등) → 카드. parseImport 가 안에서 쓰는 것과 같은 함수 */
+  rowsToCards(
+    rows: string[][],
+    columns: ImportColumn[],
+    opts?: { startId?: number },
+  ): { cards: Card[]; warnings: string[]; dropped: ImportDrop[] };
+  /** Anki 필드 HTML → 카드 markdown 부분집합. `{{c1::답::힌트}}` 는 `{{답}}` 으로, `<img src>` 는 media 의 data URI 로 */
+  ankiHtml(html: string, media?: Record<string, string>): string;
   detectFormat(text: string): "csv" | "tsv" | "md";
   toCsv(spec: unknown): string;
 

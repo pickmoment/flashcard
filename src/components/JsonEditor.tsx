@@ -4,7 +4,8 @@
  * 폼이 못 다루는 필드를 고칠 때, 그리고 남이 준 덱을 통째로 붙여넣을 때 쓴다.
  * 타이핑하는 도중에는 절대 반영하지 않는다 — 중간 상태는 대개 깨진 JSON 이고,
  * 유효한 순간마다 덱을 갈아치우면 카드 선택과 미리보기가 매 글자마다 튄다.
- * "적용" 을 누른 순간에만 덱이 바뀐다.
+ * "적용" 을 누른 순간에만 덱이 바뀐다. 적용은 다른 문서로 갈아타는 것이 아니라 같은 문서의
+ * 편집이다 — 히스토리에 쌓여 실행 취소로 되돌릴 수 있고, 저장 전까지 dirty 다.
  */
 import { useEffect, useMemo, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
@@ -76,7 +77,7 @@ export function JsonEditor(props: { deck: Deck; onApply(deck: Deck): void }) {
           <div className="diag ok">
             <span className="diag-mark">✓</span>
             <span>
-              JSON 이 유효하다 — <span className="kbd">적용</span> 을 누르면 덱을 갈아끼운다
+              JSON 이 유효하다 — <span className="kbd">적용</span> 을 누르면 덱을 갈아끼운다 (실행 취소로 되돌릴 수 있다)
             </span>
           </div>
         )

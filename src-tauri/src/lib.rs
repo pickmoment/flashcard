@@ -1,3 +1,4 @@
+mod apkg;
 mod skill;
 
 use serde::Serialize;
@@ -38,7 +39,7 @@ fn write_text(path: String, contents: String) -> Result<FileInfo, String> {
 /// 확장자로 이미지 mime 을 고른다. 모르는 확장자는 브라우저가 스니핑하도록
 /// `application/octet-stream` 으로 두고, 대신 로그를 남겨 그림이 안 뜰 때
 /// 원인을 찾을 수 있게 한다.
-fn image_mime(ext: &str) -> &'static str {
+pub(crate) fn image_mime(ext: &str) -> &'static str {
     match ext {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
@@ -68,7 +69,7 @@ fn read_data_uri(path: String) -> Result<String, String> {
 }
 
 /// 의존성 없는 표준 base64.
-fn b64(data: &[u8]) -> String {
+pub(crate) fn b64(data: &[u8]) -> String {
     const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
     for c in data.chunks(3) {
@@ -88,6 +89,19 @@ fn file_size(path: String) -> Result<u64, String> {
     std::fs::metadata(&path)
         .map(|m| m.len())
         .map_err(|e| format!("{path}: {e}"))
+}
+
+/// 경로가 있는지 — 최근 파일 목록에서 지워진 항목을 걸러내고, 자동저장
+/// 스냅샷이 남아 있는지 물을 때 쓴다. 없음과 권한 오류를 구분할 필요는 없다.
+#[tauri::command]
+fn file_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
+/// Anki 패키지(.apkg)를 읽는다. 필드는 HTML 그대로, 이미지는 data URI 로.
+#[tauri::command]
+fn read_apkg(path: String) -> Result<apkg::ApkgImport, String> {
+    apkg::read(&path)
 }
 
 /**
@@ -229,11 +243,14 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             read_text,
             write_text,
             read_data_uri,
             file_size,
+            file_exists,
+            read_apkg,
             open_file,
             reveal_file,
             home_dir,
@@ -321,5 +338,11 @@ mod tests {
         for bad in ["../deck.html", "a/b.html", "/etc/passwd", "..", ""] {
             assert!(super::temp_path(bad.into()).is_err(), "{bad} 를 거부해야 한다");
         }
+    }
+
+    #[test]
+    fn file_exists_checks_path() {
+        assert!(super::file_exists(std::env::temp_dir().to_string_lossy().into()));
+        assert!(!super::file_exists("/없는/경로/deck.json".into()));
     }
 }

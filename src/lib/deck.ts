@@ -70,6 +70,65 @@ export function moveCard(deck: Deck, id: number, delta: number): Deck {
 }
 
 /**
+ * 덱 순서 기준 `toIndex` 로 옮긴다(드래그 놓기). 범위 밖은 끝으로 붙인다 —
+ * 목록 맨 아래 빈 공간에 놓는 손짓이 "맨 뒤로" 라는 뜻이기 때문이다.
+ */
+export function moveCardTo(deck: Deck, id: number, toIndex: number): Deck {
+  const i = deck.cards.findIndex((c) => c.id === id);
+  if (i < 0) return deck;
+  const to = Math.max(0, Math.min(deck.cards.length - 1, Math.trunc(toIndex)));
+  if (to === i) return deck;
+  const cards = deck.cards.slice();
+  const [moved] = cards.splice(i, 1);
+  cards.splice(to, 0, moved);
+  return { ...deck, cards };
+}
+
+/** 여러 장을 한 번에 지운다. 없는 id 는 무시하고, 하나도 안 지웠으면 참조 그대로. */
+export function removeCards(deck: Deck, ids: number[]): Deck {
+  const drop = new Set(ids);
+  const cards = deck.cards.filter((c) => !drop.has(c.id));
+  return cards.length === deck.cards.length ? deck : { ...deck, cards };
+}
+
+/**
+ * 고른 카드들의 카테고리를 한 값으로 맞춘다. '' 이면 키째 지운다 —
+ * `"category": ""` 는 칩에 빈 이름으로 서므로 저장 JSON 에 남기지 않는다.
+ * 이미 같은 값인 카드는 건드리지 않아 바뀐 장만 새 객체가 된다.
+ */
+export function setCategory(deck: Deck, ids: number[], category: string): Deck {
+  const want = new Set(ids);
+  const value = category.trim();
+  let changed = false;
+  const cards = deck.cards.map((c) => {
+    if (!want.has(c.id) || (c.category ?? "") === value) return c;
+    changed = true;
+    return recategorize(c, value);
+  });
+  return changed ? { ...deck, cards } : deck;
+}
+
+/** `from` 카테고리인 카드 전부를 `to` 로. `to` 가 '' 이면 카테고리 제거. */
+export function renameCategory(deck: Deck, from: string, to: string): Deck {
+  const value = to.trim();
+  if (from === value) return deck;
+  let changed = false;
+  const cards = deck.cards.map((c) => {
+    if ((c.category ?? "").trim() !== from) return c;
+    changed = true;
+    return recategorize(c, value);
+  });
+  return changed ? { ...deck, cards } : deck;
+}
+
+function recategorize(card: Card, value: string): Card {
+  const next: Card = { ...card };
+  if (value) next.category = value;
+  else delete next.category;
+  return FCD.orderKeys(next);
+}
+
+/**
  * 루트 설정 부분 갱신. 빈 문자열이 된 부제는 키째 지운다 —
  * 저장 JSON 에 `"subtitle": ""` 이 남으면 diff 가 지저분해진다.
  */

@@ -6,9 +6,13 @@ import {
   duplicateCard,
   emptyDeck,
   moveCard,
+  moveCardTo,
   patchDeck,
   removeCard,
+  removeCards,
+  renameCategory,
   renumberCards,
+  setCategory,
   withCard,
 } from "./deck";
 
@@ -129,6 +133,102 @@ describe("moveCard", () => {
 
   it("입력을 변형하지 않는다", () => {
     frozen(three(), (d) => moveCard(d, 2, 1));
+  });
+});
+
+describe("moveCardTo", () => {
+  it("덱 인덱스로 옮긴다", () => {
+    expect(moveCardTo(three(), 1, 2).cards.map((c) => c.id)).toEqual([2, 3, 1]);
+    expect(moveCardTo(three(), 3, 0).cards.map((c) => c.id)).toEqual([3, 1, 2]);
+  });
+
+  it("범위 밖은 끝으로 붙인다", () => {
+    expect(moveCardTo(three(), 1, 99).cards.map((c) => c.id)).toEqual([2, 3, 1]);
+    expect(moveCardTo(three(), 3, -5).cards.map((c) => c.id)).toEqual([3, 1, 2]);
+  });
+
+  it("같은 자리·없는 id 는 참조 그대로", () => {
+    const d = three();
+    expect(moveCardTo(d, 2, 1)).toBe(d);
+    expect(moveCardTo(d, 99, 0)).toBe(d);
+  });
+
+  it("입력을 변형하지 않는다", () => {
+    frozen(three(), (d) => moveCardTo(d, 1, 2));
+  });
+});
+
+describe("removeCards", () => {
+  it("여러 장을 한 번에 지운다", () => {
+    const next = removeCards(three(), [1, 3]);
+    expect(next.cards.map((c) => c.id)).toEqual([2]);
+  });
+
+  it("없는 id 는 무시하고 남은 카드 참조는 잇는다", () => {
+    const d = three();
+    const next = removeCards(d, [99, 2]);
+    expect(next.cards.map((c) => c.id)).toEqual([1, 3]);
+    expect(next.cards[0]).toBe(d.cards[0]);
+  });
+
+  it("아무것도 안 지웠으면 참조 그대로", () => {
+    const d = three();
+    expect(removeCards(d, [])).toBe(d);
+    expect(removeCards(d, [7, 8])).toBe(d);
+  });
+
+  it("입력을 변형하지 않는다", () => {
+    frozen(three(), (d) => removeCards(d, [1, 2]));
+  });
+});
+
+describe("setCategory", () => {
+  it("고른 카드만 바꾸고 나머지 참조는 잇는다", () => {
+    const d = three();
+    const next = setCategory(d, [1, 3], " 다 ");
+    expect(next.cards.map((c) => c.category)).toEqual(["다", "나", "다"]);
+    expect(next.cards[1]).toBe(d.cards[1]);
+  });
+
+  it("빈 값이면 키째 지운다", () => {
+    const next = setCategory(three(), [2], "");
+    expect("category" in next.cards[1]).toBe(false);
+    expect(next.cards[1]).toMatchObject({ id: 2, front: "질문2" });
+  });
+
+  it("이미 같은 값이면 참조 그대로", () => {
+    const d = three();
+    expect(setCategory(d, [1, 3], "가")).toBe(d);
+    expect(setCategory(d, [99], "새")).toBe(d);
+  });
+
+  it("입력을 변형하지 않는다", () => {
+    frozen(three(), (d) => setCategory(d, [1, 2, 3], "x"));
+  });
+});
+
+describe("renameCategory", () => {
+  it("그 이름인 카드 전부를 바꾼다", () => {
+    const d = three();
+    const next = renameCategory(d, "가", "다");
+    expect(next.cards.map((c) => c.category)).toEqual(["다", "나", "다"]);
+    expect(next.cards[1]).toBe(d.cards[1]);
+  });
+
+  it("빈 이름으로 바꾸면 카테고리를 뗀다", () => {
+    const next = renameCategory(three(), "나", "  ");
+    expect("category" in next.cards[1]).toBe(false);
+    expect(categoriesOf(next)).toEqual(["가"]);
+  });
+
+  it("같은 이름·없는 이름은 참조 그대로", () => {
+    const d = three();
+    expect(renameCategory(d, "가", "가")).toBe(d);
+    expect(renameCategory(d, "없음", "새")).toBe(d);
+  });
+
+  it("입력을 변형하지 않는다", () => {
+    frozen(three(), (d) => renameCategory(d, "가", "라"));
   });
 });
 

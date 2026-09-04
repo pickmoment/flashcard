@@ -69,8 +69,20 @@ examples.forEach(function (f) {
 
 /* ---- 2. 미리보기 훅 ---- */
 var one = JSON.parse(fs.readFileSync(path.join(EX, 'starter-basic.json'), 'utf8'));
-ok('일반 빌드에는 훅이 없다', FCD.toHTML(one, { base: BASE }).indexOf('window.FCP') < 0);
-ok('preview 빌드에만 훅이 실린다', FCD.toHTML(one, { base: BASE, preview: true }).indexOf('window.FCP') > 0);
+var plainBuild = FCD.toHTML(one, { base: BASE }), previewBuild = FCD.toHTML(one, { base: BASE, preview: true });
+ok('일반 빌드에는 훅이 없다', plainBuild.indexOf('window.FCP') < 0);
+ok('preview 빌드에만 훅이 실린다', previewBuild.indexOf('window.FCP') > 0);
+ok('preview 훅에 update 가 있다', /\n  update: function \(cards\)/.test(previewBuild));
+ok('일반 빌드에는 update 훅이 없다', !/\n  update: function \(cards\)/.test(plainBuild));
+/* 훅은 base.html 최상위 함수만 부른다 — 여기 적힌 이름이 base.html 에 없으면 미리보기가 죽는다 */
+['buildOrder', 'renderChips', 'quizPool', 'startQuiz', 'setView', 'categories', 'render'].forEach(function (fn) {
+  ok('base.html 에 ' + fn + '() 가 있다', new RegExp('\\nfunction ' + fn + '\\(').test(BASE));
+});
+ok('preview 빌드 스크립트 문법', FCD.check(previewBuild).lines.every(function (l) { return l.ok; }));
+/* check() 는 첫 <script> 만 본다 — 문자열로 이어 붙인 훅 자체의 문법은 여기서 따로 잡는다 */
+var hookSrc = previewBuild.split('<script>').pop().split('</script>')[0], hookErr = null;
+try { new Function(hookSrc); } catch (e) { hookErr = e.message; }
+ok('훅 스크립트 문법', hookErr === null, hookErr);
 
 /* ---- 3. 검증이 실제로 잡는가 ---- */
 function errsOf(spec) { return FCD.validate(spec).errors.join(' | '); }
@@ -105,12 +117,28 @@ ok('중복 개념(basic+cloze)은 경고', /중복 출제/.test(warnsOf({
   id: 'x', title: 't', cards: [{ id: 1, front: 'q', back: '렉시컬 스코프' }, { id: 2, type: 'cloze', text: '함수는 {{렉시컬 스코프}} 를 기억한다' }]
 })));
 
-/* ---- 4. 퀴즈 성립 판정이 base.html 과 같은가 ---- */
+/* ---- 4. 퀴즈 성립 판정이 base.html 과 같은가 — 4지선다는 오답 3개가 있어야 성립한다 ---- */
+ok('base.html 도 임계값 3 이다', /distractors\(card, 3\)\.length >= 3 \? 'choice'|if \(distractors\(card, 3\)\.length >= 3\) return 'choice'/.test(BASE));
+ok('base.html 의 choice 는 폴백하지 않는다', /CONFIG\.quiz === 'choice' \? null : 'typing'/.test(BASE));
 var small = { id: 'x', title: 't', cards: [{ id: 1, front: 'q1', back: 'a1' }, { id: 2, front: 'q2', back: 'a2' }] };
 eq('오답이 1개면 주관식 폴백', FCD.stats(small).quiz.typing, 2);
 eq('오답이 1개면 객관식 0', FCD.stats(small).quiz.choice, 0);
+var three = { id: 'x', title: 't', cards: [1, 2, 3].map(function (i) { return { id: i, front: 'q' + i, back: 'a' + i }; }) };
+eq('오답이 2개면 auto 는 주관식', FCD.stats(three).quiz.typing, 3);
+eq('오답이 2개면 객관식 0', FCD.stats(three).quiz.choice, 0);
+var threeChoice = { id: 'x', title: 't', quiz: 'choice', cards: three.cards };
+eq('오답이 2개면 choice 는 출제 제외', FCD.stats(threeChoice).quiz.total, 0);
+eq('choice 에서 빠진 장수', FCD.stats(threeChoice).choiceDropped, 3);
+eq('quizModeOf choice 는 null', FCD.quizModeOf(three.cards, three.cards[0], 'choice'), null);
+eq('quizModeOf auto 는 typing', FCD.quizModeOf(three.cards, three.cards[0], 'auto'), 'typing');
+ok('choice 제외 경고', /choice 모드인데 3장은 오답이 3개가 안 돼/.test(warnsOf(threeChoice)), warnsOf(threeChoice));
+ok('choice 제외는 일반 제외 경고에 겹쳐 세지 않는다', !/장은 퀴즈에서 빠진다 \(sequence/.test(warnsOf(threeChoice)), warnsOf(threeChoice));
+var withChoices = { id: 'x', title: 't', quiz: 'choice', cards: [{ id: 1, front: 'q1', back: 'a1', choices: ['x', 'y', 'z'] }, { id: 2, front: 'q2', back: 'a2' }, { id: 3, front: 'q3', back: 'a3' }] };
+eq('choices 3개면 작은 덱에서도 객관식', FCD.quizModeOf(withChoices.cards, withChoices.cards[0], 'choice'), 'choice');
+eq('choices 로 채운 카드만 남고 나머지는 빠진다', FCD.stats(withChoices).choiceDropped, 2);
+ok('choices 가 2개면 경고', /choices 가 2개다 — 4지선다는 오답 3개/.test(warnsOf({ id: 'x', title: 't', cards: [{ id: 1, front: 'q', back: 'a', choices: ['b', 'c'] }] })));
 var big = { id: 'x', title: 't', cards: [1, 2, 3, 4].map(function (i) { return { id: i, front: 'q' + i, back: 'a' + i }; }) };
-eq('오답이 넉넉하면 객관식', FCD.stats(big).quiz.choice, 4);
+eq('오답이 3개면 객관식', FCD.stats(big).quiz.choice, 4);
 eq('sequence 는 출제 제외', FCD.stats({ id: 'x', title: 't', quiz: 'auto', cards: [{ id: 1, type: 'sequence', front: 'q', items: ['a', 'b'] }] }).quiz.total, 0);
 eq('mermaid 답은 출제 제외', FCD.stats({ id: 'x', title: 't', cards: [{ id: 1, front: 'q', back: '```mermaid\nflowchart LR\n a-->b\n```' }] }).quiz.total, 0);
 eq('quiz off 면 전부 제외', FCD.stats({ id: 'x', title: 't', quiz: 'off', cards: big.cards }).quiz.total, 0);
@@ -139,6 +167,75 @@ eq('sequence 항목 수', seqIn.cards[0].items.length, 3);
 
 var idStart = FCD.parseImport('a\tb\n', { startId: 10 });
 eq('startId 이어붙이기', idStart.cards[0].id, 10);
+
+/* 가져오기 진단 — 버린 줄은 원문 줄 번호로 돌아온다 */
+var diag = FCD.parseImport('front,back,tags\nA,B,x\n,,\nC,D,y', { format: 'csv' });
+eq('머리글 판정', diag.header, true);
+eq('tags 는 category', JSON.stringify(diag.columns), '["front","back","category"]');
+eq('빈 행은 버린다', diag.dropped.length, 1);
+eq('버린 행의 줄 번호(머리글 포함)', diag.dropped[0].line, 3);
+eq('읽은 행 수', diag.rows, 3);
+eq('카드 2장', diag.cards.length, 2);
+eq('category 매핑', diag.cards[1].category, 'y');
+
+var half = FCD.parseImport('question,answer,foo,memo\nq,a,x,m\n', { format: 'csv' });
+eq('절반 이상 알면 머리글', half.header, true);
+eq('모르는 머리글은 버리는 열', JSON.stringify(half.columns), '["front","back",null,"note"]');
+eq('버리는 열의 값은 카드에 안 실린다', half.cards[0].note, 'm');
+ok('모르는 머리글은 경고한다', /머리글 "foo" 열은 모르는 이름/.test(half.warnings.join(' ')));
+var noHead = FCD.parseImport('사과,apple\n포도,grape\n', { format: 'csv' });
+eq('머리글 단어가 없으면 첫 줄도 카드', noHead.header, false);
+eq('머리글 없이 카드 2장', noHead.cards.length, 2);
+var forced = FCD.parseImport('사과,apple\n포도,grape\n', { format: 'csv', header: true });
+eq('header:true 면 첫 줄을 머리글로 먹는다', forced.cards.length, 1);
+eq('아는 이름이 없는 머리글은 자리 순서로 읽는다', forced.cards[0].front, '포도');
+var kept = FCD.parseImport('front,back\nq,a\n', { format: 'csv', header: false });
+eq('header:false 면 머리글 단어도 카드', kept.cards.length, 2);
+
+var mapped = FCD.parseImport('개념,x,뜻,메모\n', { format: 'csv', columns: ['front', null, 'back', 'note'] });
+eq('columns 매핑 — front', mapped.cards[0].front, '개념');
+eq('columns 매핑 — null 열은 버린다', mapped.cards[0].back, '뜻');
+eq('columns 매핑 — note', mapped.cards[0].note, '메모');
+eq('columns 가 그대로 돌아온다', JSON.stringify(mapped.columns), '["front",null,"back","note"]');
+var ctxCol = FCD.parseImport('front\tback\tcontext\nq\ta\t지금까지: 시작\n', { format: 'tsv' });
+eq('context 열', ctxCol.cards[0].context, '지금까지: 시작');
+
+ok('홀수 따옴표는 경고', /따옴표/.test(FCD.parseImport('q,"a\nq2,a2\n', { format: 'csv' }).warnings.join(' ')));
+ok('짝 맞는 따옴표는 조용하다', !/따옴표/.test(FCD.parseImport('q,"a, b"\n', { format: 'csv' }).warnings.join(' ')));
+var commented = FCD.parseImport('#separator:tab\n#html:false\nq\ta\n', { format: 'anki' });
+eq('# 머리말은 건너뛰고 줄 번호를 지킨다', commented.cards.length, 1);
+
+var mdDrop = FCD.parseImport('- a :: b\n구분자 없는 줄\n- c | d\n', { format: 'md' });
+eq('md 구분자 없는 줄은 dropped', mdDrop.dropped.length, 1);
+eq('md dropped 줄 번호', mdDrop.dropped[0].line, 2);
+eq('md dropped 원문', mdDrop.dropped[0].text, '구분자 없는 줄');
+eq('md 경고는 요약 한 줄', mdDrop.warnings.filter(function (w) { return /건너뛰었다/.test(w); }).length, 1);
+ok('md 경고에 줄 원문을 늘어놓지 않는다', !/구분자 없는 줄/.test(mdDrop.warnings.join(' ')));
+eq('md columns', JSON.stringify(mdDrop.columns), '["front","back"]');
+
+/* rowsToCards — apkg 처럼 이미 행으로 쪼개진 표 */
+var r2c = FCD.rowsToCards([['', ''], ['q', 'a'], ['HTTP {{200}}', ''], ['순서', '빌드 -> 배포']], ['front', 'back'], { startId: 7 });
+eq('rowsToCards 빈 행 dropped', r2c.dropped.length, 1);
+eq('rowsToCards dropped 줄 번호는 순번', r2c.dropped[0].line, 1);
+eq('rowsToCards startId', r2c.cards[0].id, 7);
+eq('rowsToCards cloze 추론', r2c.cards[1].type, 'cloze');
+eq('rowsToCards sequence 추론', r2c.cards[2].type, 'sequence');
+eq('rowsToCards 모르는 열 이름은 버린다', FCD.rowsToCards([['q', 'a', 'zzz']], ['front', 'back', 'bogus']).cards[0].bogus, undefined);
+
+/* ankiHtml — Anki 필드 HTML → md() 가 읽는 markdown */
+eq('ankiHtml 줄바꿈', FCD.ankiHtml('한 줄<br>두 줄<div>세 줄</div>'), '한 줄\n두 줄\n세 줄');
+eq('ankiHtml 굵게·기울임', FCD.ankiHtml('<b>굵게</b> <strong>강조</strong> <i>기울임</i> <em>강조2</em>'), '**굵게** **강조** *기울임* *강조2*');
+eq('ankiHtml 코드', FCD.ankiHtml('<code>a &lt; b</code>'), '`a < b`');
+eq('ankiHtml img → media', FCD.ankiHtml('<img src="f.png">', { 'f.png': 'data:image/png;base64,AA' }), '![](data:image/png;base64,AA)');
+eq('ankiHtml img 없으면 파일명 유지', FCD.ankiHtml('<img src="g.png" class="x">'), '![](g.png)');
+eq('ankiHtml cloze 변환', FCD.ankiHtml('물은 {{c1::100::끓는점}}도에서 끓고 {{c2::0}}도에서 언다'), '물은 {{100}}도에서 끓고 {{0}}도에서 언다');
+eq('ankiHtml sound 제거', FCD.ankiHtml('apple[sound:apple.mp3]'), 'apple');
+eq('ankiHtml 엔티티', FCD.ankiHtml('a&nbsp;&amp;&nbsp;b &lt;tag&gt; &quot;q&quot; &#39;s&#39; &#65;&#x42;'), 'a & b <tag> "q" \'s\' AB');
+eq('ankiHtml &amp;lt; 는 글자다', FCD.ankiHtml('&amp;lt;'), '&lt;');
+eq('ankiHtml 남은 태그 제거', FCD.ankiHtml('<span style="color:red">빨강</span>'), '빨강');
+eq('ankiHtml 연속 빈 줄 정리', FCD.ankiHtml('a<br><br><br><br>b'), 'a\n\nb');
+eq('ankiHtml 목록', FCD.ankiHtml('<ul><li>하나</li><li>둘</li></ul>'), '- 하나\n- 둘');
+eq('ankiHtml 빈 값', FCD.ankiHtml(null), '');
 
 var csvOut = FCD.toCsv(one).split('\n');
 eq('csv 머리글', csvOut[0], 'id,type,category,front,back,items,note');

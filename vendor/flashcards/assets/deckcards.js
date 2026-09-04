@@ -45,8 +45,8 @@
 
   var QUIZ_MODES = {
     off: '카드 학습만 — 퀴즈 탭이 숨는다',
-    auto: 'basic 은 객관식(오답 부족하면 주관식), cloze 는 빈칸 타이핑',
-    choice: '가능한 카드는 전부 객관식',
+    auto: 'basic 은 객관식(오답 3개가 안 되면 주관식), cloze 는 빈칸 타이핑',
+    choice: '객관식만 — 오답 3개가 안 되는 basic 은 출제에서 빠진다(주관식 폴백 없음)',
     typing: '전부 주관식 타이핑 — 철자·표기 암기'
   };
 
@@ -297,14 +297,19 @@
     return n;
   }
 
-  /** null 이면 출제에서 빠진다. 'choice' | 'typing' | 'blank'. */
+  /**
+   * null 이면 출제에서 빠진다. 'choice' | 'typing' | 'blank'.
+   * 4지선다는 오답 3개가 있어야 성립한다 — 'auto' 는 부족하면 주관식으로 폴백하고,
+   * 'choice' 는 출제에서 뺀다(객관식만 원한 덱에 주관식이 섞이지 않게).
+   */
   function quizModeOf(cards, card, quiz) {
     if (quiz === 'off') return null;
     if (card.type === 'cloze') return clozeAnswers(card.text).length ? 'blank' : null;
     if (card.type === 'sequence' || hasMermaid(card)) return null;
     if (!plain(card.back)) return null;
     if (quiz === 'typing') return 'typing';
-    return distractorCount(cards, card) >= 2 ? 'choice' : 'typing';
+    if (distractorCount(cards, card) >= 3) return 'choice';
+    return quiz === 'choice' ? null : 'typing';
   }
 
   /* ==========================================================================
@@ -368,8 +373,8 @@
         W.push(at + ': 뒷면이 ' + backText.length + '자다 — 한 카드에 담기 너무 많다. 쪼갠다');
       if (c.type === 'basic' && backText.length >= 6 && frontText.toLowerCase().indexOf(backText.toLowerCase()) >= 0)
         W.push(at + ': 앞면에 답이 그대로 들어 있다 — flip 할 이유가 없어진다');
-      if (c.choices && c.choices.length === 1)
-        W.push(at + ': choices 가 1개다 — 객관식은 오답 2개 이상이 필요하다. 비우면 다른 카드 답에서 자동으로 뽑는다');
+      if (c.choices && c.choices.length && c.choices.length < 3)
+        W.push(at + ': choices 가 ' + c.choices.length + '개다 — 4지선다는 오답 3개가 필요하다. 모자란 만큼은 다른 카드 답에서 채우고, 비우면 전부 자동으로 뽑는다');
       if (C.story && !c.context)
         W.push(at + ': 스토리라인 덱인데 context("지금까지: …") 가 없다');
 
@@ -408,12 +413,14 @@
       W.push('퀴즈에 낼 수 있는 카드가 없다 — 퀴즈 탭이 숨는다 (sequence·mermaid·이미지/코드뿐인 답은 출제에서 빠진다)');
     else if (C.quiz === 'auto' && st.quiz.choice === 0 && st.quiz.typing > 0)
       W.push('덱이 작아 객관식이 성립하지 않는다 — ' + st.quiz.typing + '장이 주관식으로 폴백된다');
+    if (C.quiz === 'choice' && st.choiceDropped)
+      W.push('choice 모드인데 ' + st.choiceDropped + '장은 오답이 3개가 안 돼 퀴즈에서 빠진다 — choices 를 채우거나 auto 로 둔다');
     if (!C.story && cards.length >= 3 && st.withContext === cards.length)
       W.push('모든 카드에 context 가 있다 — 스토리라인 덱이면 story: true 로 켠다(셔플 기본 OFF)');
     if (C.reverse && st.types.basic !== cards.length)
       W.push('reverse(양방향) 는 basic 카드에만 의미가 있다 — cloze·sequence 는 뒤→앞이 성립하지 않는다');
-    if (st.excludedFromQuiz && C.quiz !== 'off')
-      W.push(st.excludedFromQuiz + '장은 퀴즈에서 빠진다 (sequence · mermaid · 답이 코드/이미지뿐)');
+    if (st.excludedFromQuiz - st.choiceDropped > 0 && C.quiz !== 'off')
+      W.push((st.excludedFromQuiz - st.choiceDropped) + '장은 퀴즈에서 빠진다 (sequence · mermaid · 답이 코드/이미지뿐)');
 
     var pal = palette(n.accent);
     if (pal && pal.contrastLight < 4.5)
@@ -447,7 +454,7 @@
     var n = normalize(spec), cards = n.cards, C = n.config;
     var types = { basic: 0, cloze: 0, sequence: 0 }, cats = [], uncategorized = 0;
     var quiz = { choice: 0, typing: 0, blank: 0, total: 0 };
-    var mermaid = 0, images = 0, externalImages = 0, blanks = 0, withContext = 0, chars = 0, excluded = 0;
+    var mermaid = 0, images = 0, externalImages = 0, blanks = 0, withContext = 0, chars = 0, excluded = 0, choiceDropped = 0;
 
     cards.forEach(function (c) {
       if (types[c.type] === undefined) types[c.type] = 0;
@@ -462,7 +469,12 @@
       if (c.type === 'cloze') blanks += clozeAnswers(c.text).length;
       chars += plain(c.front || c.text || '').length + plain(c.back || (c.items || []).join(' ')).length;
       var m = CARD_TYPES[c.type] ? quizModeOf(cards, c, C.quiz) : null;
-      if (m) { quiz[m]++; quiz.total++; } else if (C.quiz !== 'off') excluded++;
+      if (m) { quiz[m]++; quiz.total++; }
+      else if (C.quiz !== 'off') {
+        excluded++;
+        /* choice 모드에서만 빠지는 카드 — auto 였다면 주관식으로 나왔을 basic */
+        if (C.quiz === 'choice' && quizModeOf(cards, c, 'auto') === 'typing') choiceDropped++;
+      }
     });
 
     var pal = palette(n.accent);
@@ -473,6 +485,8 @@
       uncategorized: uncategorized,
       quiz: quiz,
       excludedFromQuiz: excluded,
+      /* 그중 오답 부족으로 choice 모드에서만 빠지는 장수 — auto 로 두면 주관식으로 나온다 */
+      choiceDropped: choiceDropped,
       mermaid: mermaid,
       images: images,
       externalImages: externalImages,
@@ -589,6 +603,26 @@
       '  reveal: function () { if (pres.on) presNext(); },\n' +
       '  category: function (c) { state.cat = c || "all"; buildOrder(false); renderChips(); render(); return state.cat; },\n' +
       '  reset: function () { try { localStorage.removeItem(CONFIG.id); } catch (e) {} restart(true); },\n' +
+      '  /* DECK 을 제자리에서 갈아끼운다 — 문서를 다시 로드하지 않으므로 진행·스크롤·탭이 남는다.\n' +
+      '     CONFIG(제목·퀴즈 모드·색·비율)나 mermaid CDN 유무가 바뀌면 다시 빌드해야 한다 */\n' +
+      '  update: function (cards) {\n' +
+      '    if (!Array.isArray(cards)) return false;\n' +
+      '    DECK.splice.apply(DECK, [0, DECK.length].concat(cards));\n' +
+      '    Object.keys(byId).forEach(function (k) { delete byId[k]; });\n' +
+      '    DECK.forEach(function (c) { byId[c.id] = c; });\n' +
+      '    window.FCP.cards = DECK.map(function (c) { return { id: c.id, type: c.type || "basic", category: c.category || null }; });\n' +
+      '    if (state.cat !== "all" && categories().indexOf(state.cat) < 0) state.cat = "all";\n' +
+      '    if (state.review) state.order = state.order.filter(function (id) { return byId[id]; });\n' +
+      '    renderChips();\n' +
+      '    buildOrder(true);\n' +
+      '    document.getElementById("tabs").hidden = CONFIG.quiz === "off" || quizPool().length === 0;\n' +
+      '    document.getElementById("deck-sub").textContent = (CONFIG.subtitle ? CONFIG.subtitle + " · " : "") + DECK.length + "장";\n' +
+      '    render();\n' +
+      '    if (!document.getElementById("view-quiz").hidden) {\n' +
+      '      if (document.getElementById("tabs").hidden) setView("study"); else startQuiz();\n' +
+      '    }\n' +
+      '    return true;\n' +
+      '  },\n' +
       '  state: function () {\n' +
       '    return { index: state.index, id: state.order[state.index] == null ? null : state.order[state.index],\n' +
       '             total: state.order.length, flipped: state.flipped, category: state.cat,\n' +
@@ -678,62 +712,80 @@
     return 'md';
   }
 
-  /** RFC4180 한 줄 파서 — 인용부호 안의 구분자와 줄바꿈을 지킨다. */
+  /**
+   * RFC4180 파서 — 인용부호 안의 구분자와 줄바꿈을 지킨다.
+   * 행마다 원문 줄 번호(1부터)를 함께 돌려준다 — 버린 행을 사람이 원문에서 찾아 고칠 수 있게.
+   * `#` 으로 시작하는 줄은 주석으로 건너뛴다(Anki 내보내기의 `#separator:tab` 같은 머리말).
+   * 아무것도 없는 빈 줄은 행이 아니다. 구분자만 있는 줄(`,,`)은 행이다 — 빈 행으로 보고해야 한다.
+   */
   function parseDelimited(text, sep) {
-    var rows = [], row = [], field = '', q = false, s = String(text);
+    var rows = [], row = [], field = '', q = false, s = String(text), line = 1, rowLine = 1, quotes = 0;
     for (var i = 0; i < s.length; i++) {
       var ch = s[i];
       if (q) {
         if (ch === '"') {
-          if (s[i + 1] === '"') { field += '"'; i++; } else q = false;
-        } else field += ch;
-      } else if (ch === '"') q = true;
+          quotes++;
+          if (s[i + 1] === '"') { field += '"'; i++; quotes++; } else q = false;
+        } else {
+          if (ch === '\n') line++;
+          field += ch;
+        }
+      } else if (ch === '#' && !row.length && field === '') {
+        while (i < s.length && s[i] !== '\n') i++;
+        line++; rowLine = line;
+      } else if (ch === '"') { q = true; quotes++; }
       else if (ch === sep) { row.push(field); field = ''; }
-      else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (ch === '\n') {
+        if (row.length || field.trim()) { row.push(field); rows.push({ cells: row, line: rowLine }); }
+        row = []; field = ''; line++; rowLine = line;
+      }
       else if (ch !== '\r') field += ch;
     }
-    if (field || row.length) { row.push(field); rows.push(row); }
-    return rows.filter(function (r) { return r.some(function (c) { return c.trim(); }); });
+    if (row.length || field.trim()) { row.push(field); rows.push({ cells: row, line: rowLine }); }
+    return { rows: rows, unbalanced: quotes % 2 === 1 };
   }
 
-  var HEADER_WORDS = { front: 'front', back: 'back', category: 'category', note: 'note', 앞면: 'front', 뒷면: 'back', 질문: 'front', 답: 'back', 카테고리: 'category', 보충: 'note' };
+  var HEADER_WORDS = {
+    front: 'front', back: 'back', category: 'category', note: 'note', context: 'context',
+    question: 'front', answer: 'back', tags: 'category', tag: 'category', extra: 'note', memo: 'note',
+    앞면: 'front', 뒷면: 'back', 질문: 'front', 답: 'back', 정답: 'back',
+    카테고리: 'category', 분류: 'category', 태그: 'category',
+    보충: 'note', 보충설명: 'note', 메모: 'note', 문맥: 'context'
+  };
+  var COLUMN_ROLES = ['front', 'back', 'category', 'note', 'context'];
+  var DEFAULT_COLUMNS = ['front', 'back', 'category', 'note'];
+
+  function headerRole(cell) { return HEADER_WORDS[String(cell).trim().toLowerCase()] || null; }
+
+  /** 첫 행이 머리글인가 — 셀의 절반 이상이 알려진 머리글 단어면 머리글이다. 전부 맞아야 한다고 하면 `tags` 하나에 걸려 첫 카드가 머리글이 된다. */
+  function looksLikeHeader(cells) {
+    var known = cells.filter(headerRole).length;
+    return known > 0 && known * 2 >= cells.length;
+  }
 
   /**
-   * 표·목록을 카드 배열로. 형식을 모르면 추측한다.
-   * `{{ }}` 만 있고 답 칸이 비면 cloze 로, `1.`/`->` 로 이어진 항목은 sequence 로 읽는다.
+   * 행(문자열 배열) → 카드. `columns` 가 각 열의 역할이고 null 은 버리는 열이다.
+   * parseImport 가 안에서 쓰고, apkg 처럼 이미 행으로 쪼개진 표는 이걸 바로 부른다.
+   * `{{ }}` 만 있고 답 칸이 비면 cloze 로, `1.`/`->` 로 이어진 답은 sequence 로 읽는다.
+   *
+   * @param {object} opts { startId, lines: 행별 원문 줄 번호(없으면 1부터 순번) }
    */
-  function parseImport(text, opts) {
+  function rowsToCards(rows, columns, opts) {
     opts = opts || {};
-    var format = opts.format && opts.format !== 'auto' ? opts.format : detectFormat(text);
-    var startId = opts.startId || 1;
-    var warnings = [], rows = [];
+    var startId = opts.startId || 1, lines = opts.lines || null;
+    var cols = (columns || DEFAULT_COLUMNS).map(function (c) { return COLUMN_ROLES.indexOf(c) >= 0 ? c : null; });
+    var cards = [], warnings = [], dropped = [];
 
-    if (format === 'csv' || format === 'tsv' || format === 'anki') {
-      rows = parseDelimited(String(text).replace(/^#[^\n]*\n/gm, ''), format === 'csv' ? ',' : '\t');
-      var order = ['front', 'back', 'category', 'note'];
-      if (rows.length && rows[0].every(function (c) { return HEADER_WORDS[c.trim().toLowerCase()]; })) {
-        order = rows.shift().map(function (c) { return HEADER_WORDS[c.trim().toLowerCase()]; });
+    (rows || []).forEach(function (cells, idx) {
+      var r = {}, line = lines ? lines[idx] : idx + 1;
+      (cells || []).forEach(function (v, i) {
+        if (cols[i]) r[cols[i]] = String(v == null ? '' : v).trim();
+      });
+      var front = r.front || '', back = r.back || '';
+      if (!front && !back) {
+        dropped.push({ line: line, text: snippet(cells), reason: '매핑된 칸(front·back)이 전부 비어 있다' });
+        return;
       }
-      rows = rows.map(function (r) {
-        var o = {};
-        r.forEach(function (v, i) { if (order[i]) o[order[i]] = v.trim(); });
-        return o;
-      });
-    } else {
-      String(text).split(/\r?\n/).forEach(function (line) {
-        var l = line.trim().replace(/^[-*+]\s+/, '');
-        if (!l || l[0] === '#') return;
-        var m = l.split(/\s+::\s+|\s+\|\s+|\s+—\s+/);
-        if (m.length >= 2) rows.push({ front: m[0].trim(), back: m.slice(1).join(' | ').trim() });
-        else if (/\{\{[^}]+\}\}/.test(l)) rows.push({ front: l, back: '' });
-        else warnings.push('구분자(`::` · `|`)가 없어 건너뛴 줄: ' + l.slice(0, 40));
-      });
-    }
-
-    var cards = [];
-    rows.forEach(function (r) {
-      var front = (r.front || '').trim(), back = (r.back || '').trim();
-      if (!front && !back) return;
       var card;
       if (!back && /\{\{[^}]+\}\}/.test(front)) card = { id: startId + cards.length, type: 'cloze', text: front };
       else if (/(^|\s)(\d\.|->|→)/.test(back) && back.split(/\s*(?:->|→|\d\.\s*)\s*/).filter(Boolean).length >= 2)
@@ -743,13 +795,123 @@
         };
       else card = { id: startId + cards.length, type: 'basic', front: front, back: back };
       if (r.category) card.category = r.category;
+      if (r.context) card.context = r.context;
       if (r.note) card.note = r.note;
-      if (card.type === 'basic' && !card.back) warnings.push('답이 비어 있다: ' + front.slice(0, 40));
+      if (card.type === 'basic' && !card.back) warnings.push(line + '줄: 답이 비어 있다 — ' + front.slice(0, 40));
       cards.push(orderKeys(card));
     });
 
-    if (!cards.length) warnings.push('카드를 하나도 읽지 못했다 — 형식을 지정해 다시 시도한다');
-    return { cards: cards, warnings: warnings, format: format };
+    return { cards: cards, warnings: warnings, dropped: dropped };
+  }
+
+  /** 버린 행을 알아볼 만큼만 — 40자. */
+  function snippet(cells) {
+    return (Array.isArray(cells) ? cells : [cells]).map(function (v) { return String(v == null ? '' : v).trim(); })
+      .filter(Boolean).join(' | ').slice(0, 40);
+  }
+
+  /**
+   * 표·목록을 카드 배열로. 형식을 모르면 추측한다.
+   *
+   * @param {object} opts { format, startId, columns: 열 역할 배열(주면 머리글 추론 대신 쓴다),
+   *                        header: 'auto' | true | false — 첫 행을 머리글로 읽을지 }
+   * @returns {{ cards, warnings, format, columns, header, rows, dropped }}
+   *   dropped 의 line 은 원문 줄 번호(1부터, 표 형식은 머리글을 포함한 줄 번호)다.
+   */
+  function parseImport(text, opts) {
+    opts = opts || {};
+    var format = opts.format && opts.format !== 'auto' ? opts.format : detectFormat(text);
+    var startId = opts.startId || 1;
+    var headerOpt = opts.header == null ? 'auto' : opts.header;
+    var warnings = [], dropped = [], rows = [], lines = [], columns, header = false;
+
+    if (format === 'csv' || format === 'tsv' || format === 'anki') {
+      var parsed = parseDelimited(text, format === 'csv' ? ',' : '\t');
+      if (parsed.unbalanced) warnings.push('따옴표(")가 짝이 안 맞는다 — 인용부호 안에서 여러 줄이 한 칸으로 합쳐졌을 수 있다');
+      var table = parsed.rows;
+      header = table.length > 0 && (headerOpt === true || (headerOpt === 'auto' && looksLikeHeader(table[0].cells)));
+      var headRow = header ? table.shift() : null;
+      if (Array.isArray(opts.columns)) columns = opts.columns.slice();
+      else if (headRow && headRow.cells.some(headerRole)) {
+        columns = headRow.cells.map(headerRole);
+        headRow.cells.forEach(function (c, i) {
+          if (c.trim() && !columns[i]) warnings.push('머리글 "' + c.trim() + '" 열은 모르는 이름이라 버린다 (front · back · category · note · context 나 그 한국어)');
+        });
+      } else {
+        /* header:true 인데 아는 이름이 하나도 없으면 첫 줄만 버리고 자리 순서로 읽는다 — 전부 버리면 카드가 0장이 된다 */
+        columns = DEFAULT_COLUMNS.slice();
+        if (headRow) warnings.push('머리글에 아는 열 이름이 없어 front · back · category · note 순서로 읽는다');
+      }
+      rows = table.map(function (r) { return r.cells; });
+      lines = table.map(function (r) { return r.line; });
+    } else {
+      columns = ['front', 'back'];
+      String(text).split(/\r?\n/).forEach(function (line, i) {
+        var l = line.trim().replace(/^[-*+]\s+/, '');
+        if (!l || l[0] === '#') return;
+        var m = l.split(/\s+::\s+|\s+\|\s+|\s+—\s+/);
+        if (m.length >= 2) { rows.push([m[0].trim(), m.slice(1).join(' | ').trim()]); lines.push(i + 1); }
+        else if (/\{\{[^}]+\}\}/.test(l)) { rows.push([l, '']); lines.push(i + 1); }
+        else dropped.push({ line: i + 1, text: l.slice(0, 40), reason: '구분자(`::` · `|` · `—`)가 없다' });
+      });
+      if (dropped.length) warnings.push(dropped.length + '줄을 건너뛰었다 — 구분자(`::` · `|`)가 없는 줄이다');
+    }
+
+    var made = rowsToCards(rows, columns, { startId: startId, lines: lines });
+    var skippedLines = dropped.length;
+    warnings = warnings.concat(made.warnings);
+    dropped = dropped.concat(made.dropped).sort(function (a, b) { return a.line - b.line; });
+    if (made.dropped.length) warnings.push(made.dropped.length + '행은 front·back 이 전부 비어 있어 버렸다');
+    if (!made.cards.length) warnings.push('카드를 하나도 읽지 못했다 — 형식이나 열 매핑을 지정해 다시 시도한다');
+
+    return {
+      cards: made.cards, warnings: warnings, format: format,
+      columns: columns, header: header, rows: rows.length + skippedLines, dropped: dropped
+    };
+  }
+
+  /* ---- Anki 필드 HTML → 카드 markdown ----
+     Anki 는 필드를 HTML 로 저장한다. base.html 의 md() 는 HTML 을 전부 escape 하므로 그대로 넣으면
+     태그가 글자로 보인다. DOM 없이 문자열만 만진다 — Node 의 CLI 와 웹뷰 양쪽에서 같은 결과를 내야 한다. */
+
+  var NAMED_ENTITIES = { nbsp: ' ', lt: '<', gt: '>', quot: '"', apos: "'", ensp: ' ', emsp: ' ', hellip: '…', mdash: '—', ndash: '–', laquo: '«', raquo: '»' };
+
+  /** `&amp;` 는 마지막에 푼다 — `&amp;lt;` 는 `&lt;` 라는 글자이지 `<` 가 아니다. */
+  function decodeEntities(s) {
+    return String(s)
+      .replace(/&#x([0-9a-fA-F]+);/g, function (m, h) { return String.fromCodePoint(parseInt(h, 16)); })
+      .replace(/&#(\d+);/g, function (m, d) { return String.fromCodePoint(parseInt(d, 10)); })
+      .replace(/&([a-zA-Z]+);/g, function (m, name) { return NAMED_ENTITIES[name] !== undefined ? NAMED_ENTITIES[name] : m; })
+      .replace(/&amp;/g, '&');
+  }
+
+  /**
+   * Anki 필드 HTML → md() 가 해석하는 markdown 부분집합.
+   * `<img src="f.png">` 는 media[f.png](data URI) 로 바꿔 단일 파일을 지킨다 — 없으면 파일명 그대로 두어
+   * 검증이 "외부 경로" 로 지적하게 한다. `[sound:…]` 는 재생할 수 없으니 지운다.
+   * `{{c1::답::힌트}}` 는 `{{답}}` — 힌트는 base.html 의 cloze 문법에 자리가 없다.
+   */
+  function ankiHtml(html, media) {
+    var s = String(html == null ? '' : html);
+    s = s.replace(/\[sound:[^\]]*\]/g, '');
+    s = s.replace(/\{\{c\d+::([^}]*)\}\}/g, function (m, body) { return '{{' + body.split('::')[0].trim() + '}}'; });
+    s = s.replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/?div\b[^>]*>/gi, '\n')
+      .replace(/<\/p\s*>/gi, '\n')
+      .replace(/<\/?(?:ul|ol)\b[^>]*>/gi, '\n')
+      .replace(/<li\b[^>]*>/gi, '\n- ').replace(/<\/li\s*>/gi, '');
+    s = s.replace(/<(b|strong)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi, '**$2**')
+      .replace(/<(i|em)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi, '*$2*')
+      .replace(/<code\b[^>]*>([\s\S]*?)<\/code\s*>/gi, '`$1`');
+    s = s.replace(/<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>/gi, function (m, a, b, c) {
+      var f = decodeEntities(a || b || c || '').trim();
+      return '![](' + ((media && media[f]) || f) + ')';
+    });
+    s = s.replace(/<[^>]+>/g, '');
+    s = decodeEntities(s);
+    return s.replace(/\r/g, '').split('\n')
+      .map(function (l) { return l.replace(/\s+$/, ''); }).join('\n')
+      .replace(/\n{3,}/g, '\n\n').trim();
   }
 
   function csvCell(v) {
@@ -798,6 +960,8 @@
     check: check,
 
     parseImport: parseImport,
+    rowsToCards: rowsToCards,
+    ankiHtml: ankiHtml,
     detectFormat: detectFormat,
     toCsv: toCsv,
 

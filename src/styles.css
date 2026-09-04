@@ -449,6 +449,93 @@ textarea {
   opacity: 1;
 }
 
+/* 드래그로 옮길 수 있는 행 — 정렬·검색 중엔 draggable 을 떼므로 커서가 곧 상태 표시다 */
+.card-row[draggable="true"] {
+  cursor: grab;
+}
+
+.card-row.dragging {
+  opacity: 0.45;
+}
+
+/* 놓을 자리 표시선 — 대상 행의 위/아래 절반 */
+.card-row.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.card-row.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* 목록 아래 빈 공간에 놓기 — 맨 뒤로 */
+.list.drop-end {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* 다중 선택 — active(편집 중) 와 구별되게 배경만 옅게 칠한다 */
+.card-row.picked {
+  background: var(--accent-dim);
+}
+
+.card-row.picked .card-row-n {
+  color: var(--accent);
+}
+
+/* 검색·정렬 줄 — 입력이 남는 폭을 다 쓰고 select 는 제 크기만 */
+.list-tools {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+}
+
+.list-tools .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-tools .select {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.list-count {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+/* 일괄 도구줄 — 2장 이상 선택했을 때만 나타난다 */
+.bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--accent-dim);
+  font-size: 12px;
+}
+
+.bulk .input {
+  flex: 1;
+  min-width: 90px;
+}
+
+/* 칩 이름 바꾸기 — 칩 자리에 그대로 들어가는 입력 */
+.chip-edit {
+  border: 1px solid var(--accent);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  width: 110px;
+  outline: none;
+}
+
 /* ---------- 배지 · 칩 ---------- */
 .badge {
   display: inline-flex;
@@ -546,6 +633,35 @@ textarea {
 .diag-why {
   color: var(--dim);
   font-size: 11px;
+}
+
+/* 가져오기 열 매핑 — 열 이름 · 역할 select · 첫 행 표본 */
+.map-table {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(120px, 1fr) minmax(0, 1.4fr);
+  gap: 4px 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.map-sample {
+  color: var(--dim);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* 접이식 진단 목록 — 버린 줄처럼 많을 수 있는 것은 접어 둔다 */
+.fold > summary {
+  font-size: 11px;
+  color: var(--sub);
+  cursor: pointer;
+}
+
+.fold .diag {
+  margin-top: 4px;
 }
 
 /* ---------- 통계 ---------- */
@@ -652,6 +768,8 @@ textarea {
   left: 50%;
   bottom: 22px;
   transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
   background: var(--surface-2);
   border: 1px solid var(--line-2);
   border-radius: 999px;
@@ -662,6 +780,11 @@ textarea {
   max-width: 82vw;
 }
 
+/* 토스트 안 액션(실행 취소) — 글과 붙지 않게 띄운다 */
+.toast .btn {
+  margin-left: 10px;
+}
+
 .toast.err {
   border-color: var(--err);
   color: var(--err);
@@ -670,6 +793,54 @@ textarea {
 .toast.ok {
   border-color: var(--ok);
   color: var(--ok);
+}
+
+/* ---------- 드롭다운 ---------- */
+/* 버튼을 감싸는 앵커 — 목록은 이 안에서 absolute 로 내려온다 */
+.menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 260px;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  padding: 4px;
+  z-index: 30;
+}
+
+.menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.menu-item:hover:not(:disabled) {
+  background: var(--accent-dim);
+}
+
+.menu-item:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 @media (max-width: 1180px) {

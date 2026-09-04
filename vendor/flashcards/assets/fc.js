@@ -2,8 +2,8 @@
 /*!
  * fc — flashcards 스킬 CLI
  *
- *   node fc.js validate <deck.json>
- *   node fc.js build    <deck.json> [-o out.html] [--preview]
+ *   node fc.js validate <deck.json> [more.json …]
+ *   node fc.js build    <deck.json> [more.json …] [-o out.html|디렉토리] [--preview] [--watch]
  *   node fc.js check    <out.html>
  *   node fc.js import   <표.csv|.tsv|.md> [-o deck.json] [--format csv|tsv|md|anki]
  *                                          [--title "덱 제목"] [--id flashcards-…-v1]
@@ -13,6 +13,7 @@
  *   node fc.js test
  *
  *   --preview   미리보기 훅(window.FCP)을 얹는다 — 앱이 카드를 짚어 보는 데 쓴다
+ *   --watch     스펙 파일과 base.html 을 지켜보다 바뀌면 다시 빌드한다 (Ctrl+C 로 끝낸다)
  *   --base <f>  base.html 을 다른 경로에서 읽는다 (기본: ../references/base.html)
  *
  * 덱 스펙은 CONFIG 와 DECK 을 한 파일에 담은 JSON 이다:
@@ -20,6 +21,8 @@
  *     "accent": "indigo", "ratio": "8/5", "cards": [ … ] }
  *
  * 산출물 파일명은 원본 스펙의 이름(stem)을 그대로 잇는다 — `deck.json` → `deck.html`.
+ * 스펙을 여럿 주면 `-o` 는 디렉토리다(없으면 만든다). 하나만 줘도 `-o` 가 기존 디렉토리거나
+ * `/` 로 끝나면 그 안에 `<stem>.html` 로 쓴다.
  */
 'use strict';
 var fs = require('fs'), path = require('path');
@@ -45,11 +48,16 @@ function usage(code) {
 
 function die(msg) { console.error('  ✗ ' + msg); process.exit(1); }
 
-function readSpec(f) {
-  if (!f) die('덱 스펙 파일이 없다.');
-  if (!fs.existsSync(f)) die('그런 파일이 없다: ' + f);
+/** JSON 스펙을 읽는다. 실패하면 던진다 — watch 모드에서는 죽지 않고 ✗ 만 찍어야 한다. */
+function loadSpec(f) {
+  if (!f) throw new Error('덱 스펙 파일이 없다.');
+  if (!fs.existsSync(f)) throw new Error('그런 파일이 없다: ' + f);
   try { return JSON.parse(fs.readFileSync(f, 'utf8')); }
-  catch (e) { die('JSON 파싱 실패: ' + e.message); }
+  catch (e) { throw new Error('JSON 파싱 실패 (' + f + '): ' + e.message); }
+}
+
+function readSpec(f) {
+  try { return loadSpec(f); } catch (e) { die(e.message); }
 }
 
 /** base.html 소스. 스킬 안에 있는 것을 쓰고, `--base` 로 덮을 수 있다. */
@@ -61,6 +69,19 @@ function readBase() {
 
 function outPath(src, ext) {
   return flags.out || String(src).replace(/\.[^.]+$/, '') + ext;
+}
+
+/**
+ * 빌드 산출물 경로. 스펙이 여럿이면 `-o` 는 디렉토리다. 하나뿐이어도 `-o` 가 이미 있는 디렉토리거나
+ * `/` 로 끝나면 디렉토리로 본다 — `-o dist/` 가 `dist` 라는 파일이 되는 것보다 낫다.
+ */
+function buildOutPath(src, many) {
+  var stem = path.basename(src).replace(/\.[^.]+$/, '') + '.html';
+  if (!flags.out) return path.join(path.dirname(src), stem);
+  var isDir = many || /[\\/]$/.test(flags.out) || (fs.existsSync(flags.out) && fs.statSync(flags.out).isDirectory());
+  if (!isDir) return flags.out;
+  fs.mkdirSync(flags.out, { recursive: true });
+  return path.join(flags.out, stem);
 }
 
 /** 검증 결과를 gm 과 같은 모양으로 낸다 — ✗ 는 고치고, ! 는 이유가 있어야 무시한다. */
@@ -91,26 +112,72 @@ if (!cmd || flags.help || cmd === 'help') usage(cmd ? 0 : 1);
 if (cmd === 'test') { require(path.join(__dirname, 'selftest.js')); return; }
 
 if (cmd === 'validate') {
-  process.exit(report(FCD.validate(readSpec(files[0]))) ? 0 : 1);
+  if (!files.length) die('덱 스펙 파일이 없다.');
+  var allOk = files.map(function (f) {
+    if (files.length > 1) console.error('  ─ ' + f);
+    return report(FCD.validate(readSpec(f)));
+  }).every(Boolean);
+  process.exit(allOk ? 0 : 1);
 }
 
 if (cmd === 'build') {
-  var spec = readSpec(files[0]);
-  var v = FCD.validate(spec);
-  if (!report(v)) { console.error('  → 오류를 고치고 다시 빌드한다.'); process.exit(1); }
-  var out = outPath(files[0], '.html');
-  var html;
-  try { html = FCD.toHTML(spec, { base: readBase(), preview: !!flags.preview }); }
-  catch (e) { die(e.message); }
-  fs.writeFileSync(out, html);
-  console.error('  → ' + out + ' (' + Math.round(html.length / 1024) + 'KB)' + (flags.preview ? ' [미리보기 훅]' : ''));
+  if (!files.length) die('덱 스펙 파일이 없다.');
+  var many = files.length > 1;
 
-  var c = FCD.check(html);
-  var bad = c.lines.filter(function (l) { return !l.ok; });
-  bad.forEach(function (l) { console.error('  ✗ 검수: ' + l.label + ' ← ' + l.why); });
-  console.error('    검수 ' + (bad.length ? bad.length + '건 실패' : '통과') + ' — ' + c.info);
+  /** 스펙 하나를 빌드한다. 실패는 false 로 돌려준다 — watch 모드가 살아 있어야 한다. */
+  function buildOne(src) {
+    if (many || flags.watch) console.error('  ─ ' + src);
+    var spec, html, out;
+    try {
+      spec = loadSpec(src);
+      var v = FCD.validate(spec);
+      if (!report(v)) { console.error('  ✗ 오류를 고치고 다시 빌드한다.'); return false; }
+      out = buildOutPath(src, many);
+      html = FCD.toHTML(spec, { base: readBase(), preview: !!flags.preview });
+      fs.writeFileSync(out, html);
+    } catch (e) { console.error('  ✗ ' + e.message); return false; }
+    console.error('  → ' + out + ' (' + Math.round(html.length / 1024) + 'KB)' + (flags.preview ? ' [미리보기 훅]' : ''));
+
+    var c = FCD.check(html);
+    var bad = c.lines.filter(function (l) { return !l.ok; });
+    bad.forEach(function (l) { console.error('  ✗ 검수: ' + l.label + ' ← ' + l.why); });
+    console.error('    검수 ' + (bad.length ? bad.length + '건 실패' : '통과') + ' — ' + c.info);
+    return !bad.length;
+  }
+
+  var results = files.map(buildOne);
   console.error('    조작: Space 뒤집기 · ←→ 이동 · 1 알아요 · 2 몰라요 · S 셔플 · P 발표');
-  process.exit(bad.length ? 1 : 0);
+  if (!flags.watch) process.exit(results.every(Boolean) ? 0 : 1);
+
+  /* watch — 파일이 아니라 디렉토리를 지켜본다. 에디터가 임시 파일에 쓰고 rename 하는 저장 방식이면
+     파일 watcher 는 첫 저장 뒤 끊어지지만, 디렉토리 watcher 는 그 rename 을 그대로 본다.
+     base.html 이 바뀌면 전부, 스펙이 바뀌면 그 스펙만 다시 빌드한다. 150ms 디바운스로 저장 한 번에
+     두 번 오는 이벤트를 한 번으로 모은다. */
+  var basePath = path.resolve(flags.base || path.join(__dirname, '..', 'references', 'base.html'));
+  var pending = {}, timer;
+  function schedule(src) {
+    pending[src] = 1;
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      var list = pending[basePath] ? files.slice() : files.filter(function (f) { return pending[path.resolve(f)]; });
+      pending = {};
+      console.error('\n  ↻ ' + new Date().toLocaleTimeString() + ' 다시 빌드 (' + list.length + '개)');
+      list.forEach(buildOne);
+    }, 150);
+  }
+  var watched = {};
+  files.map(function (f) { return path.resolve(f); }).concat(basePath).forEach(function (abs) {
+    var dir = path.dirname(abs), name = path.basename(abs);
+    if (!watched[dir]) {
+      watched[dir] = {};
+      try {
+        fs.watch(dir, function (ev, fn) { if (fn && watched[dir][String(fn)]) schedule(path.join(dir, String(fn))); });
+      } catch (e) { console.error('  ✗ 지켜볼 수 없다: ' + dir + ' — ' + e.message); }
+    }
+    watched[dir][name] = 1;
+  });
+  console.error('  … ' + files.length + '개 스펙과 base.html 을 지켜보는 중 — Ctrl+C 로 끝낸다');
+  return;
 }
 
 if (cmd === 'check') {
@@ -130,6 +197,8 @@ if (cmd === 'import') {
   var byExt = { '.csv': 'csv', '.tsv': 'tsv', '.txt': 'tsv', '.md': 'md' }[path.extname(src).toLowerCase()];
   var r = FCD.parseImport(fs.readFileSync(src, 'utf8'), { format: flags.format || byExt || 'auto' });
   r.warnings.forEach(function (w) { console.error('  ! ' + w); });
+  /* 버린 줄은 원문 줄 번호로 — 사람이 파일에서 바로 찾아 고친다 */
+  r.dropped.forEach(function (d) { console.error('    ' + d.line + '줄 버림: ' + d.reason + (d.text ? ' — ' + d.text : '')); });
   if (!r.cards.length) process.exit(1);
   var slug = path.basename(src).replace(/\.[^.]+$/, '').replace(/[^\w가-힣-]+/g, '-').toLowerCase();
   var deck = {
@@ -143,7 +212,8 @@ if (cmd === 'import') {
   };
   var o = outPath(src, '.json');
   fs.writeFileSync(o, JSON.stringify(deck, null, 2) + '\n');
-  console.error('  → ' + o + ' — ' + r.format + ' 로 읽어 카드 ' + r.cards.length + '장');
+  console.error('  → ' + o + ' — ' + r.format + ' 로 읽어 카드 ' + r.cards.length + '장' +
+    (r.header ? ' (머리글 ' + r.columns.map(function (c) { return c || '버림'; }).join('·') + ')' : ''));
   report(FCD.validate(deck));
   process.exit(0);
 }
